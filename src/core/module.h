@@ -31,7 +31,7 @@ private:
     std::condition_variable m_cv;
 
 public:
-    IModule(ExecutionMode mode = ExecutionMode::ONCE, double frequencyHz = 0.0);
+    explicit IModule(ExecutionMode mode = ExecutionMode::ONCE, double frequencyHz = 0.0);
     virtual ~IModule();
 
     bool init();

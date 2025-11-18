@@ -3,7 +3,7 @@
 #include <mutex>
 #include <queue>
 
-#include "module.h"
+#include "core/module.h"
 
 struct Box {
 
