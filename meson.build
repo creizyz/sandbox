@@ -4,7 +4,8 @@ project('sandbox', 'cpp',
 
 sources = [
     'src/main.cpp',
-    'src/core/module.cpp'
+    'src/core/module.cpp',
+    'src/value.cpp',
 ]
 
 sandbox = executable('sandbox', sources, install : true)

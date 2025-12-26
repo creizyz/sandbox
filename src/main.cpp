@@ -15,6 +15,10 @@ struct Event {
 };
 
 class EventListener {
+public:
+    virtual ~EventListener() = default;
+
+private:
     virtual void onEvent(Event event) = 0;
 };
 
