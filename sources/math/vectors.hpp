@@ -57,21 +57,21 @@ namespace math
 
         template <typename Op>
             requires std::invocable<Op, T>
-        [[nodiscard]] constexpr Vector apply(Op op) const
+        [[nodiscard]] constexpr Vector<N, T> apply(Op op) const
         {
             return apply_impl(op, std::make_index_sequence<N>{});
         }
 
         template <typename Op>
             requires std::invocable<Op, T, T>
-        [[nodiscard]] constexpr Vector transform(const Vector& other, Op op) const
+        [[nodiscard]] constexpr Vector<N, T> transform(const Vector<N, T> & other, Op op) const
         {
             return transform_impl(other, op, std::make_index_sequence<N>{});
         }
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] static constexpr Vector fill(U value) {
+        [[nodiscard]] static constexpr Vector<N, T> fill(U value) {
             return fill_impl(static_cast<T>(value), std::make_index_sequence<N>{});
         }
 
@@ -95,7 +95,7 @@ namespace math
 
         template <typename Pred>
             requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool all(const Vector& other, Pred pred) const
+        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred pred) const
         {
             return all_impl(other, pred, std::make_index_sequence<N>{});
         }
@@ -109,15 +109,15 @@ namespace math
 
         template <typename Pred>
             requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool any(const Vector& other, Pred pred) const
+        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred pred) const
         {
             return any_impl(other, pred, std::make_index_sequence<N>{});
         }
 
         // --- Constants ---
 
-        static constexpr Vector zero = fill(static_cast<T>(0));
-        static constexpr Vector one  = fill(static_cast<T>(1));
+        static constexpr Vector<N, T> zero = fill(static_cast<T>(0));
+        static constexpr Vector<N, T> one  = fill(static_cast<T>(1));
 
         // --- Named access ---
 
@@ -161,7 +161,7 @@ namespace math
 
         // --- Vector Arithmetic ---
 
-        [[nodiscard]] constexpr T dot(const Vector& other) const
+        [[nodiscard]] constexpr T dot(const Vector<N, T> & other) const
         {
             return dot_impl(other, std::make_index_sequence<N>{});
         }
@@ -296,20 +296,20 @@ namespace math
 
         template <typename Op, std::size_t... I>
             requires std::convertible_to<std::invoke_result_t<Op, T>, T>
-        constexpr Vector apply_impl(Op op, std::index_sequence<I...>) const
+        constexpr Vector<N, T> apply_impl(Op op, std::index_sequence<I...>) const
         {
             return Vector{ static_cast<T>(op(this->m_data[I]))... };
         }
 
         template <typename Op, std::size_t... I>
             requires std::convertible_to<std::invoke_result_t<Op, T, T>, T>
-        constexpr Vector transform_impl(const Vector& other, Op op, std::index_sequence<I...>) const
+        constexpr Vector<N, T> transform_impl(const Vector<N, T> & other, Op op, std::index_sequence<I...>) const
         {
             return Vector{ static_cast<T>(op(this->m_data[I], other.m_data[I]))... };
         }
 
         template <std::size_t... I>
-        static constexpr Vector fill_impl(T value, std::index_sequence<I...>) {
+        static constexpr Vector<N, T> fill_impl(T value, std::index_sequence<I...>) {
             return Vector{ (static_cast<void>(I), value)... };
         }
 
@@ -320,7 +320,7 @@ namespace math
         }
 
         template <typename Pred, std::size_t... I>
-        constexpr bool all_impl(const Vector& other, Pred pred, std::index_sequence<I...>) const
+        constexpr bool all_impl(const Vector<N, T> & other, Pred pred, std::index_sequence<I...>) const
         {
             return (static_cast<bool>(pred(this->m_data[I], other.m_data[I])) && ...);
         }
@@ -332,13 +332,13 @@ namespace math
         }
 
         template <typename Pred, std::size_t... I>
-        constexpr bool any_impl(const Vector& other, Pred pred, std::index_sequence<I...>) const
+        constexpr bool any_impl(const Vector<N, T> & other, Pred pred, std::index_sequence<I...>) const
         {
             return (static_cast<bool>(pred(this->m_data[I], other.m_data[I])) || ...);
         }
 
         template <std::size_t... I>
-        constexpr T dot_impl(const Vector& other, std::index_sequence<I...>) const
+        constexpr T dot_impl(const Vector<N, T> & other, std::index_sequence<I...>) const
         {
             return ((this->m_data[I] * other.m_data[I]) + ...);
         }
