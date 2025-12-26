@@ -2,7 +2,7 @@
 
 #include <array>
 
-#include "vectors-view.h"
+#include "vectors-view.hpp"
 
 namespace math
 {

@@ -1,8 +1,8 @@
-#include "../json.h"
+#include "json.hpp"
 
 #include <charconv>
 
-#include "../strings.h"
+#include "helpers/strings.hpp"
 
 constexpr std::string_view LEXER_UNEXPECTED_CHAR = "unexpected character";
 constexpr std::string_view LEXER_UNEXPECTED_EOF  = "unexpected EOF";
@@ -190,118 +190,122 @@ Value JsonParser::parseArray(JsonLexer& lexer)
 
 Value JsonParser::parseObject(JsonLexer& lexer)
 {
-    if (lexer.peek() == '}') // quick escape
-    {
-        lexer.next(); // consume closing brace
-        return Value::object();
-    }
+    // if (lexer.peek() == '}') // quick escape
+    // {
+    //     lexer.next(); // consume closing brace
+    //     return Value::object();
+    // }
+    //
+    // auto obj = Value::object_t{ };
+    // while (true)
+    // {
+    //     Token keyToken = lexer.next();
+    //     if (keyToken.type != TokenType::String) return {}; // Expected string key
+    //
+    //     if (lexer.next().type != TokenType::Colon) return {};
+    //
+    //     // Optimization: Check for Arithmetic Wrapper Signature
+    //     // This is "efficient and maintainable" because it isolates the complex logic
+    //     // into a specific check rather than complicating the generic loop.
+    //     if (first && keyToken.payload == "type")
+    //     {
+    //         // Peek next token (the value of "type")
+    //         // We have to consume it to check it, but that's fine as we are committing to a path
+    //         Token typeValToken = lexer.next();
+    //
+    //         if (typeValToken.type == TokenType::String)
+    //         {
+    //             // Check if the type name is one of our known arithmetic types
+    //             int typeIdx = -1;
+    //             for (size_t i = 1; i < value_type_names.size(); ++i)
+    //             {
+    //                 if (value_type_names[i] == typeValToken.payload)
+    //                 {
+    //                     typeIdx = static_cast<int>(i);
+    //                     break;
+    //                 }
+    //             }
+    //
+    //             if (typeIdx != -1)
+    //             {
+    //                 // It IS an arithmetic wrapper
+    //                 return parse_arithmetic_wrapper(lexer, typeIdx);
+    //             }
+    //
+    //             // Not a wrapper, just a key named "type". Add to object.
+    //             obj.emplace("type", unescapeString(typeValToken.payload));
+    //         }
+    //         else
+    //         {
+    //             // Value of "type" wasn't a string, so definitely not our wrapper
+    //             // We need to parse whatever that value is recursively
+    //             // But we already consumed the token. We need to handle this edge case.
+    //             // Ideally we would 'putback' or recursively parse from token.
+    //             // For simplicity in this specific "type" string check,
+    //             // we can't easily recurse if we already consumed the token.
+    //             // However, in valid JSON "type" value usually is a string.
+    //             // If it's not, we just treat it as object.
+    //             // (Implementation simplified: assuming "type" value is string for now,
+    //             //  or you can refactor to peek token type before consuming)
+    //              return {}; // Error for this specific restricted implementation
+    //         }
+    //     }
+    //     else
+    //     {
+    //         obj.emplace(unescapeString(keyToken.payload), parse_recursive(lexer));
+    //     }
+    //
+    //     Token next = lexer.next();
+    //     if (next.type == TokenType::RBrace) break;
+    //     if (next.type != TokenType::Comma) return {};
+    // }
+    // return obj;
 
-    auto obj = Value::object_t{ };
-    while (true)
-    {
-        Token keyToken = lexer.next();
-        if (keyToken.type != TokenType::String) return {}; // Expected string key
-
-        if (lexer.next().type != TokenType::Colon) return {};
-
-        // Optimization: Check for Arithmetic Wrapper Signature
-        // This is "efficient and maintainable" because it isolates the complex logic
-        // into a specific check rather than complicating the generic loop.
-        if (first && keyToken.payload == "type")
-        {
-            // Peek next token (the value of "type")
-            // We have to consume it to check it, but that's fine as we are committing to a path
-            Token typeValToken = lexer.next();
-
-            if (typeValToken.type == TokenType::String)
-            {
-                // Check if the type name is one of our known arithmetic types
-                int typeIdx = -1;
-                for (size_t i = 1; i < value_type_names.size(); ++i)
-                {
-                    if (value_type_names[i] == typeValToken.payload)
-                    {
-                        typeIdx = static_cast<int>(i);
-                        break;
-                    }
-                }
-
-                if (typeIdx != -1)
-                {
-                    // It IS an arithmetic wrapper
-                    return parse_arithmetic_wrapper(lexer, typeIdx);
-                }
-
-                // Not a wrapper, just a key named "type". Add to object.
-                obj.emplace("type", unescapeString(typeValToken.payload));
-            }
-            else
-            {
-                // Value of "type" wasn't a string, so definitely not our wrapper
-                // We need to parse whatever that value is recursively
-                // But we already consumed the token. We need to handle this edge case.
-                // Ideally we would 'putback' or recursively parse from token.
-                // For simplicity in this specific "type" string check,
-                // we can't easily recurse if we already consumed the token.
-                // However, in valid JSON "type" value usually is a string.
-                // If it's not, we just treat it as object.
-                // (Implementation simplified: assuming "type" value is string for now,
-                //  or you can refactor to peek token type before consuming)
-                 return {}; // Error for this specific restricted implementation
-            }
-        }
-        else
-        {
-            obj.emplace(unescapeString(keyToken.payload), parse_recursive(lexer));
-        }
-
-        Token next = lexer.next();
-        if (next.type == TokenType::RBrace) break;
-        if (next.type != TokenType::Comma) return {};
-    }
-    return obj;
+    return {};
 }
 
 Value JsonParser::parseArithmeticWrapper(JsonLexer& lexer)
 {
-    // We already consumed { "type": "int32"
-    // Expect: , "value": <number> }
+    // // We already consumed { "type": "int32"
+    // // Expect: , "value": <number> }
+    //
+    // if (lexer.next().type != TokenType::Comma) return {};
+    //
+    // Token key = lexer.next();
+    // if (key.type != TokenType::String || key.payload != "value") return {};
+    //
+    // if (lexer.next().type != TokenType::Colon) return {};
+    //
+    // Token valToken = lexer.next();
+    // if (valToken.type != TokenType::Number) return {};
+    //
+    // Value result;
+    // const auto* start = valToken.payload.data();
+    // const auto* end = start + valToken.payload.size();
+    //
+    // // High-performance conversion using std::from_chars
+    // switch (type_index)
+    // {
+    // case 1: { int32_t v; std::from_chars(start, end, v); result = v; break; }
+    // case 2: { uint32_t v; std::from_chars(start, end, v); result = v; break; }
+    // case 3: { int64_t v; std::from_chars(start, end, v); result = v; break; }
+    // case 4: { uint64_t v; std::from_chars(start, end, v); result = v; break; }
+    // case 5: { int16_t v; std::from_chars(start, end, v); result = static_cast<char>(v); break; }
+    // case 6: { uint16_t v; std::from_chars(start, end, v); result = static_cast<unsigned char>(v); break; }
+    // case 7: {
+    //         char* e;
+    //         result = std::strtof(start, &e); // from_chars for float is C++17/20 partial support
+    //         break;
+    // }
+    // case 8: {
+    //         char* e;
+    //         result = std::strtod(start, &e);
+    //         break;
+    // }
+    // }
+    //
+    // if (lexer.next().type != TokenType::RBrace) return {};
+    // return result;
 
-    if (lexer.next().type != TokenType::Comma) return {};
-
-    Token key = lexer.next();
-    if (key.type != TokenType::String || key.payload != "value") return {};
-
-    if (lexer.next().type != TokenType::Colon) return {};
-
-    Token valToken = lexer.next();
-    if (valToken.type != TokenType::Number) return {};
-
-    Value result;
-    const auto* start = valToken.payload.data();
-    const auto* end = start + valToken.payload.size();
-
-    // High-performance conversion using std::from_chars
-    switch (type_index)
-    {
-    case 1: { int32_t v; std::from_chars(start, end, v); result = v; break; }
-    case 2: { uint32_t v; std::from_chars(start, end, v); result = v; break; }
-    case 3: { int64_t v; std::from_chars(start, end, v); result = v; break; }
-    case 4: { uint64_t v; std::from_chars(start, end, v); result = v; break; }
-    case 5: { int16_t v; std::from_chars(start, end, v); result = static_cast<char>(v); break; }
-    case 6: { uint16_t v; std::from_chars(start, end, v); result = static_cast<unsigned char>(v); break; }
-    case 7: {
-            char* e;
-            result = std::strtof(start, &e); // from_chars for float is C++17/20 partial support
-            break;
-    }
-    case 8: {
-            char* e;
-            result = std::strtod(start, &e);
-            break;
-    }
-    }
-
-    if (lexer.next().type != TokenType::RBrace) return {};
-    return result;
+    return {};
 }

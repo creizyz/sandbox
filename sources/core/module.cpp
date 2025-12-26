@@ -1,4 +1,4 @@
-#include "module.h"
+#include "module.hpp"
 
 IModule::IModule(ExecutionMode mode, double frequencyHz)
     : m_state{ State::CREATED }

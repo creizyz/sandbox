@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
-#include "vectors.h"
-#include "quaternion.h"
+#include "vectors.hpp"
+#include "quaternion.hpp"
 
 namespace math
 {

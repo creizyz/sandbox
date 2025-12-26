@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include "vectors.h"
+#include "vectors.hpp"
 
 namespace math
 {

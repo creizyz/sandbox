@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 
-#include "../value.h"
+#include "core/value.hpp"
 
 enum class TokenType : uint8_t
 {
