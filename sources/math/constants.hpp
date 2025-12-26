@@ -7,5 +7,4 @@ namespace math
 
     template <typename T>
     constexpr auto epsilon_v = epsilon<T>::value;
-
 }

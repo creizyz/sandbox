@@ -8,23 +8,23 @@ namespace math
     template <typename T>
     constexpr T cross(const Vector2<T>& a, const Vector2<T>& b)
     {
-        return a.x * b.y - a.y * b.x;
+        return a.x() * b.y() - a.y() * b.x();
     }
 
     template <typename T>
     constexpr Vector3<T> cross(const Vector3<T>& a, const Vector3<T>& b)
     {
-        return {
-            a.y * b.z - a.z * b.y,
-            a.z * b.x - a.x * b.z,
-            a.x * b.y - a.y * b.x
+        return Vector3<T>{
+            a.y() * b.z() - a.z() * b.y(),
+            a.z() * b.x() - a.x() * b.z(),
+            a.x() * b.y() - a.y() * b.x()
         };
     }
 
     template <typename T>
     constexpr Vector3<T> rotate(const Vector3<T>& v, const Quaternion<T>& q)
     {
-        // Standard formula: v' = v + 2 * cross(q.xyz, cross(q.xyz, v) + q.w * v)
+        // Standard formula: v' = v + 2 * cross(q.x()yz, cross(q.x()yz, v) + q.w * v)
         Vector3<T> qv{ q.x(), q.y(), q.z() };
         Vector3<T> t = static_cast<T>(2) * cross(qv, v);
         return v + q.w() * t + cross(qv, t);

@@ -19,19 +19,19 @@ namespace math
 
         constexpr T x() const
         {
-            return data.x;
+            return data.x();
         }
         constexpr T y() const
         {
-            return data.y;
+            return data.y();
         }
         constexpr T z() const
         {
-            return data.z;
+            return data.z();
         }
         constexpr T w() const
         {
-            return data.w;
+            return data.w();
         }
 
         // --- Shared Features ---
@@ -62,16 +62,16 @@ namespace math
         constexpr Quaternion operator*(const Quaternion & other) const
         {
             return Quaternion(
-                data.w * other.data.x + data.x * other.data.w + data.y * other.data.z - data.z * other.data.y,
-                data.w * other.data.y - data.x * other.data.z + data.y * other.data.w + data.z * other.data.x,
-                data.w * other.data.z + data.x * other.data.y - data.y * other.data.x + data.z * other.data.w,
-                data.w * other.data.w - data.x * other.data.x - data.y * other.data.y - data.z * other.data.z
+                data.w() * other.data.x() + data.x() * other.data.w() + data.y() * other.data.z() - data.z() * other.data.y(),
+                data.w() * other.data.y() - data.x() * other.data.z() + data.y() * other.data.w() + data.z() * other.data.x(),
+                data.w() * other.data.z() + data.x() * other.data.y() - data.y() * other.data.x() + data.z() * other.data.w(),
+                data.w() * other.data.w() - data.x() * other.data.x() - data.y() * other.data.y() - data.z() * other.data.z()
             );
         }
 
         constexpr Quaternion conjugate() const
         {
-            return Quaternion(-data.x, -data.y, -data.z, data.w);
+            return Quaternion(-data.x(), -data.y(), -data.z(), data.w());
         }
     };
 }
