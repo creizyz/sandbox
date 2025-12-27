@@ -13,8 +13,11 @@
 namespace math
 {
     template <std::size_t N, typename T>
+    inline constexpr std::size_t vector_alignment_v = (sizeof(T) * N >= 16 ? 16 : alignof(std::array<T, N>));
+
+    template <std::size_t N, typename T>
         requires (N > 0 && std::is_arithmetic_v<T>)
-    class alignas(16) Vector
+    class alignas(vector_alignment_v<N, T>) Vector
     {
         std::array<T, N> m_data;
 
@@ -22,9 +25,9 @@ namespace math
             requires (I > 0 && std::is_arithmetic_v<U>)
         friend class Vector;
 
-    public:
-        static constexpr auto size = N;
+        static constexpr std::size_t K_UNROLL_THRESHOLD = 4;
 
+    public:
         constexpr Vector() = default;
 
         template <typename... Args>
@@ -52,27 +55,78 @@ namespace math
             requires std::is_convertible_v<T, U>
         [[nodiscard]] constexpr Vector<N, U> cast() const
         {
-            return cast_impl<U>(std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return cast_impl<U>(std::make_index_sequence<N>{});
+            }
+            else
+            {
+                Vector<N, U> out{};
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out.m_data[i] = static_cast<U>(m_data[i]);
+                }
+                return out;
+            }
         }
 
         template <typename Op>
-            requires std::invocable<Op, T>
-        [[nodiscard]] constexpr Vector<N, T> apply(Op op) const
+            requires (std::invocable<Op&, T> && std::is_convertible_v<std::invoke_result_t<Op&, T>, T>)
+        [[nodiscard]] constexpr Vector<N, T> apply(Op && op) const noexcept(noexcept(std::invoke(op, T{})))
         {
-            return apply_impl(op, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return apply_impl(std::forward<Op>(op), std::make_index_sequence<N>{});
+            }
+            else
+            {
+                Vector<N, T> out{};
+                auto fn = std::forward<Op>(op);
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out.m_data[i] = static_cast<T>(std::invoke(fn, m_data[i]));
+                }
+                return out;
+            }
         }
 
         template <typename Op>
-            requires std::invocable<Op, T, T>
-        [[nodiscard]] constexpr Vector<N, T> transform(const Vector<N, T> & other, Op op) const
+            requires (std::invocable<Op&, T, T> && std::is_convertible_v<std::invoke_result_t<Op&, T, T>, T>)
+        [[nodiscard]] constexpr Vector<N, T> transform(const Vector<N, T> & other, Op && op) const noexcept(noexcept(std::invoke(op, T{}, T{})))
         {
-            return transform_impl(other, op, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return transform_impl(other, std::forward<Op>(op), std::make_index_sequence<N>{});
+            }
+            else
+            {
+                Vector<N, T> out{};
+                auto fn = std::forward<Op>(op);
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out.m_data[i] = static_cast<T>(std::invoke(fn, m_data[i], other.m_data[i]));
+                }
+                return out;
+            }
         }
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] static constexpr Vector<N, T> fill(U value) {
-            return fill_impl(static_cast<T>(value), std::make_index_sequence<N>{});
+        [[nodiscard]] static constexpr Vector<N, T> fill(U value)
+        {
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return fill_impl(static_cast<T>(value), std::make_index_sequence<N>{});
+            }
+            else
+            {
+                Vector<N, T> out{};
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out.m_data[i] = static_cast<T>(value);
+                }
+                return out;
+            }
         }
 
         template <typename U>
@@ -88,30 +142,78 @@ namespace math
 
         template <typename Pred>
             requires std::predicate<Pred, T>
-        [[nodiscard]] constexpr bool all(Pred pred) const
+        [[nodiscard]] constexpr bool all(Pred pred) const noexcept(noexcept(std::invoke(pred, T{})))
         {
-            return all_impl(pred, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return all_impl(pred, std::make_index_sequence<N>{});
+            }
+            else
+            {
+                auto out{ true };
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out &= pred(m_data[i]);
+                }
+                return out;
+            }
         }
 
         template <typename Pred>
             requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred pred) const
+        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred pred) const noexcept(noexcept(std::invoke(pred, T{}, T{})))
         {
-            return all_impl(other, pred, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return all_impl(other, pred, std::make_index_sequence<N>{});
+            }
+            else
+            {
+                auto out{ true };
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out &= pred(m_data[i], other.m_data[i]);
+                }
+                return out;
+            }
         }
 
         template <typename Pred>
             requires std::predicate<Pred, T>
-        [[nodiscard]] constexpr bool any(Pred pred) const
+        [[nodiscard]] constexpr bool any(Pred pred) const noexcept(noexcept(std::invoke(pred, T{})))
         {
-            return any_impl(pred, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return any_impl(pred, std::make_index_sequence<N>{});
+            }
+            else
+            {
+                auto out{ false };
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out |= pred(m_data[i]);
+                }
+                return out;
+            }
         }
 
         template <typename Pred>
             requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred pred) const
+        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred pred) const noexcept(noexcept(std::invoke(pred, T{}, T{})))
         {
-            return any_impl(other, pred, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return any_impl(other, pred, std::make_index_sequence<N>{});
+            }
+            else
+            {
+                auto out{ false };
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out |= pred(m_data[i], other.m_data[i]);
+                }
+                return out;
+            }
         }
 
         // --- Constants ---
@@ -119,33 +221,38 @@ namespace math
         static constexpr Vector<N, T> zero = fill(static_cast<T>(0));
         static constexpr Vector<N, T> one  = fill(static_cast<T>(1));
 
+        static constexpr std::size_t size() noexcept
+        {
+            return N;
+        }
+
         // --- Named access ---
 
-        [[nodiscard]] constexpr T& x() requires (N >= 1 && N <= 4) { return this->m_data[0]; }
-        [[nodiscard]] constexpr T& y() requires (N >= 2 && N <= 4) { return this->m_data[1]; }
-        [[nodiscard]] constexpr T& z() requires (N >= 3 && N <= 4) { return this->m_data[2]; }
-        [[nodiscard]] constexpr T& w() requires (N >= 4 && N <= 4) { return this->m_data[3]; }
+        [[nodiscard]] constexpr T& x() noexcept requires (N >= 1 && N <= 4) { return m_data[0]; }
+        [[nodiscard]] constexpr T& y() noexcept requires (N >= 2 && N <= 4) { return m_data[1]; }
+        [[nodiscard]] constexpr T& z() noexcept requires (N >= 3 && N <= 4) { return m_data[2]; }
+        [[nodiscard]] constexpr T& w() noexcept requires (N == 4)           { return m_data[3]; }
 
-        [[nodiscard]] constexpr const T& x() const requires (N >= 1 && N <= 4) { return this->m_data[0]; }
-        [[nodiscard]] constexpr const T& y() const requires (N >= 2 && N <= 4) { return this->m_data[1]; }
-        [[nodiscard]] constexpr const T& z() const requires (N >= 3 && N <= 4) { return this->m_data[2]; }
-        [[nodiscard]] constexpr const T& w() const requires (N >= 4 && N <= 4) { return this->m_data[3]; }
+        [[nodiscard]] constexpr const T& x() const noexcept requires (N >= 1 && N <= 4) { return m_data[0]; }
+        [[nodiscard]] constexpr const T& y() const noexcept requires (N >= 2 && N <= 4) { return m_data[1]; }
+        [[nodiscard]] constexpr const T& z() const noexcept requires (N >= 3 && N <= 4) { return m_data[2]; }
+        [[nodiscard]] constexpr const T& w() const noexcept requires (N == 4)           { return m_data[3]; }
 
         // --- Basic Arithmetic ---
 
-        [[nodiscard]] constexpr Vector<N, T> operator+(const Vector<N, T> & other) const
+        [[nodiscard]] constexpr Vector<N, T> operator+(const Vector<N, T> & other) const noexcept
         {
             return transform(other, std::plus<T>{});
         }
 
-        [[nodiscard]] constexpr Vector<N, T> operator-(const Vector<N, T> & other) const
+        [[nodiscard]] constexpr Vector<N, T> operator-(const Vector<N, T> & other) const noexcept
         {
             return transform(other, std::minus<T>{});
         }
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] constexpr Vector<N, T> operator*(U scalar) const
+        [[nodiscard]] constexpr Vector<N, T> operator*(U scalar) const noexcept
         {
             const auto s = static_cast<T>(scalar);
             return apply([s](T val) { return val * s; });
@@ -153,22 +260,42 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] constexpr Vector<N, T> operator/(U scalar) const
+        [[nodiscard]] constexpr Vector<N, T> operator/(U scalar) const noexcept
         {
-            const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-            return apply([inv](T val) { return val * inv; });
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
+                return apply([inv](T val) { return val * inv; });
+            }
+            else
+            {
+                const auto s = static_cast<T>(scalar);
+                return apply([s](T val) { return val / s; });
+            }
         }
 
         // --- Vector Arithmetic ---
 
-        [[nodiscard]] constexpr T dot(const Vector<N, T> & other) const
+        [[nodiscard]] constexpr T dot(const Vector<N, T> & other) const noexcept
         {
-            return dot_impl(other, std::make_index_sequence<N>{});
+            if constexpr (N <= K_UNROLL_THRESHOLD)
+            {
+                return dot_impl(other, std::make_index_sequence<N>{});
+            }
+            else
+            {
+                T out{ 0 };
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    out += m_data[i] * other.m_data[i];
+                }
+                return out;
+            }
         }
 
         // --- Compound Assignment ---
 
-        Vector<N, T> & operator+=(const Vector<N, T> & other)
+        Vector<N, T> & operator+=(const Vector<N, T> & other) noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -177,7 +304,7 @@ namespace math
             return *this;
         }
 
-        Vector<N, T> & operator-=(const Vector<N, T> & other)
+        Vector<N, T> & operator-=(const Vector<N, T> & other) noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -188,7 +315,7 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        Vector<N, T> & operator*=(U scalar)
+        Vector<N, T> & operator*=(U scalar) noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -199,14 +326,14 @@ namespace math
 
         // --- Unary ---
 
-        [[nodiscard]] constexpr Vector<N, T> operator-() const
+        [[nodiscard]] constexpr Vector<N, T> operator-() const noexcept
         {
             return apply([](T val) { return -val; });
         }
 
-        [[nodiscard]] constexpr T squaredLength() const
+        [[nodiscard]] constexpr T squaredLength() const noexcept
         {
-            return squaredLength_impl(std::make_index_sequence<N>{});
+            return dot(*this);
         }
 
         [[nodiscard]] constexpr T length() const
@@ -218,7 +345,14 @@ namespace math
         [[nodiscard]] constexpr Vector<N, T> normalized() const
             requires std::floating_point<T>
         {
-            return *this / length();
+            const auto len = length();
+            if (len > epsilon_v<T>)
+            {
+                const auto invLen = static_cast<T>(1.0) / len;
+                return *this * invLen;
+            }
+
+            return zero;
         }
 
         constexpr Vector<N, T> & normalize()
@@ -235,23 +369,19 @@ namespace math
 
         // --- Comparison ---
 
-        template <typename U>
-            requires std::is_convertible_v<U, T>
-        [[nodiscard]] bool operator==(const Vector<N, U> & other) const
+        [[nodiscard]] constexpr bool operator==(const Vector<N, T> & other) const
         {
             if constexpr (std::is_floating_point_v<T>)
             {
-                return all(other, [](const T & a, const U & b) { return std::abs(a - static_cast<T>(b)) < epsilon_v<T>; });
+                return all(other, [](const T & a, const T & b) { return std::abs(a - static_cast<T>(b)) < epsilon_v<T>; });
             }
             else
             {
-                return all(other, [](const T & a, const U & b) { return a == static_cast<T>(b); });
+                return all(other, [](const T & a, const T & b) { return a == static_cast<T>(b); });
             }
         }
 
-        template <typename U>
-            requires std::is_convertible_v<U, T>
-        [[nodiscard]] bool operator!=(const Vector<N, U> & other) const
+        [[nodiscard]] constexpr bool operator!=(const Vector<N, T> & other) const
         {
             return !(*this == other);
         }
@@ -260,24 +390,48 @@ namespace math
 
         [[nodiscard]] constexpr const T & operator[](std::size_t index) const noexcept
         {
-            assert(index < N);
-            return this->m_data[index];
+            return m_data[index];
         }
 
         [[nodiscard]] constexpr T & operator[](std::size_t index) noexcept
         {
+            return m_data[index];
+        }
+
+        [[nodiscard]] constexpr const T & at(std::size_t index) const
+        {
             assert(index < N);
-            return this->m_data[index];
+            return m_data[index];
+        }
+
+        [[nodiscard]] constexpr T & at(std::size_t index)
+        {
+            assert(index < N);
+            return m_data[index];
+        }
+
+        template <std::size_t Index>
+            requires (Index < N)
+        [[nodiscard]] constexpr const T & get() const noexcept
+        {
+            return m_data[Index];
+        }
+
+        template <std::size_t Index>
+            requires (Index < N)
+        [[nodiscard]] constexpr T & get() noexcept
+        {
+            return m_data[Index];
         }
 
         [[nodiscard]] constexpr const T* data() const noexcept
         {
-            return this->m_data.data();
+            return m_data.data();
         }
 
         [[nodiscard]] constexpr T* data() noexcept
         {
-            return this->m_data.data();
+            return m_data.data();
         }
 
     private:
@@ -291,62 +445,59 @@ namespace math
         template <typename U, std::size_t... I>
         constexpr Vector<N, U> cast_impl(std::index_sequence<I...>) const
         {
-            return Vector<N, U>{ static_cast<U>(this->m_data[I])... };
+            return Vector<N, U>{ static_cast<U>(m_data[I])... };
         }
 
         template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op, T>, T>
-        constexpr Vector<N, T> apply_impl(Op op, std::index_sequence<I...>) const
+            requires std::convertible_to<std::invoke_result_t<Op&, T>, T>
+        constexpr Vector<N, T> apply_impl(Op && op, std::index_sequence<I...>) const
         {
-            return Vector{ static_cast<T>(op(this->m_data[I]))... };
+            auto fn = std::forward<Op>(op);
+            return Vector{ static_cast<T>(std::invoke(fn, m_data[I]))... };
         }
 
         template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op, T, T>, T>
-        constexpr Vector<N, T> transform_impl(const Vector<N, T> & other, Op op, std::index_sequence<I...>) const
+            requires std::convertible_to<std::invoke_result_t<Op&, T, T>, T>
+        constexpr Vector<N, T> transform_impl(const Vector<N, T> & other, Op && op, std::index_sequence<I...>) const
         {
-            return Vector{ static_cast<T>(op(this->m_data[I], other.m_data[I]))... };
+            auto fn = std::forward<Op>(op);
+            return Vector{ static_cast<T>(std::invoke(fn, m_data[I], other.m_data[I]))... };
         }
 
         template <std::size_t... I>
-        static constexpr Vector<N, T> fill_impl(T value, std::index_sequence<I...>) {
+        static constexpr Vector<N, T> fill_impl(T value, std::index_sequence<I...>)
+        {
             return Vector{ (static_cast<void>(I), value)... };
         }
 
         template <typename Pred, std::size_t... I>
         constexpr bool all_impl(Pred pred, std::index_sequence<I...>) const
         {
-            return (static_cast<bool>(pred(this->m_data[I])) && ...);
+            return (static_cast<bool>(pred(m_data[I])) && ...);
         }
 
         template <typename Pred, std::size_t... I>
         constexpr bool all_impl(const Vector<N, T> & other, Pred pred, std::index_sequence<I...>) const
         {
-            return (static_cast<bool>(pred(this->m_data[I], other.m_data[I])) && ...);
+            return (static_cast<bool>(pred(m_data[I], other.m_data[I])) && ...);
         }
 
         template <typename Pred, std::size_t... I>
         constexpr bool any_impl(Pred pred, std::index_sequence<I...>) const
         {
-            return (static_cast<bool>(pred(this->m_data[I])) || ...);
+            return (static_cast<bool>(pred(m_data[I])) || ...);
         }
 
         template <typename Pred, std::size_t... I>
         constexpr bool any_impl(const Vector<N, T> & other, Pred pred, std::index_sequence<I...>) const
         {
-            return (static_cast<bool>(pred(this->m_data[I], other.m_data[I])) || ...);
+            return (static_cast<bool>(pred(m_data[I], other.m_data[I])) || ...);
         }
 
         template <std::size_t... I>
         constexpr T dot_impl(const Vector<N, T> & other, std::index_sequence<I...>) const
         {
-            return ((this->m_data[I] * other.m_data[I]) + ...);
-        }
-
-        template <std::size_t... I>
-        constexpr T squaredLength_impl(std::index_sequence<I...>) const
-        {
-            return ((this->m_data[I] * this->m_data[I]) + ...);
+            return ((m_data[I] * other.m_data[I]) + ...);
         }
     };
 
