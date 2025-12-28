@@ -115,11 +115,11 @@ static void BM_Vector_SquaredLength(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        // Make v change so squaredLength can't be hoisted to a constant.
+        // Make v change so squared_length can't be hoisted to a constant.
         v[0] = 1.0f + static_cast<float>(i) * 1e-7f;
         benchmark::DoNotOptimize(v);
 
-        float lenSq = v.squaredLength();
+        float lenSq = v.squared_length();
         benchmark::DoNotOptimize(lenSq);
 
         ++i;

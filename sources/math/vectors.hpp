@@ -72,11 +72,11 @@ namespace math
 
         template <typename Op>
             requires (std::invocable<Op&, T> && std::is_convertible_v<std::invoke_result_t<Op&, T>, T>)
-        [[nodiscard]] constexpr Vector<N, T> apply(Op && op) const noexcept(noexcept(std::invoke(op, T{})))
+        [[nodiscard]] constexpr Vector<N, T> transform(Op && op) const noexcept(noexcept(std::invoke(op, T{})))
         {
             if constexpr (N <= K_UNROLL_THRESHOLD)
             {
-                return apply_impl(std::forward<Op>(op), std::make_index_sequence<N>{});
+                return transform_impl(std::forward<Op>(op), std::make_index_sequence<N>{});
             }
             else
             {
@@ -135,7 +135,7 @@ namespace math
         {
             const auto min = static_cast<T>(minValue);
             const auto max = static_cast<T>(maxValue);
-            return apply([min, max](T val) {
+            return transform([min, max](T val) {
                 return val < min ? min : (val > max ? max : val);
             });
         }
@@ -255,7 +255,7 @@ namespace math
         [[nodiscard]] constexpr Vector<N, T> operator*(U scalar) const noexcept
         {
             const auto s = static_cast<T>(scalar);
-            return apply([s](T val) { return val * s; });
+            return transform([s](T val) { return val * s; });
         }
 
         template <typename U>
@@ -265,12 +265,12 @@ namespace math
             if constexpr (std::is_floating_point_v<T>)
             {
                 const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-                return apply([inv](T val) { return val * inv; });
+                return transform([inv](T val) { return val * inv; });
             }
             else
             {
                 const auto s = static_cast<T>(scalar);
-                return apply([s](T val) { return val / s; });
+                return transform([s](T val) { return val / s; });
             }
         }
 
@@ -328,10 +328,10 @@ namespace math
 
         [[nodiscard]] constexpr Vector<N, T> operator-() const noexcept
         {
-            return apply([](T val) { return -val; });
+            return transform([](T val) { return -val; });
         }
 
-        [[nodiscard]] constexpr T squaredLength() const noexcept
+        [[nodiscard]] constexpr T squared_length() const noexcept
         {
             return dot(*this);
         }
@@ -339,7 +339,7 @@ namespace math
         [[nodiscard]] constexpr T length() const
             requires std::floating_point<T>
         {
-            return std::sqrt(squaredLength());
+            return std::sqrt(squared_length());
         }
 
         [[nodiscard]] constexpr Vector<N, T> normalized() const
@@ -450,7 +450,7 @@ namespace math
 
         template <typename Op, std::size_t... I>
             requires std::convertible_to<std::invoke_result_t<Op&, T>, T>
-        constexpr Vector<N, T> apply_impl(Op && op, std::index_sequence<I...>) const
+        constexpr Vector<N, T> transform_impl(Op && op, std::index_sequence<I...>) const
         {
             auto fn = std::forward<Op>(op);
             return Vector{ static_cast<T>(std::invoke(fn, m_data[I]))... };

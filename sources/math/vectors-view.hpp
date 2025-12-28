@@ -11,88 +11,179 @@ namespace math
     {
         std::array<T *, N> m_data;
 
-        template <std::size_t I, typename U>
-            requires (I > 0 && std::is_arithmetic_v<U>)
-        friend class Vector;
+        template <std::size_t M, typename U>
+            requires (M > 0 && std::is_arithmetic_v<U>)
+        friend class VectorView;
 
     public:
         static constexpr auto size = N;
 
         using value_type = T;
-        using reference = VectorView<N, T> &;
-        using const_reference = const VectorView<N, T> &;
+        using self_reference = VectorView<N, T> &;
+        using const_self_reference = const VectorView<N, T> &;
+
+        // --- Constructors (no null view accepted) ---
+
+        VectorView() = delete;
+
+        VectorView(const VectorView&) noexcept = default;
+        VectorView& operator=(const VectorView&) noexcept = default;
+
+        VectorView(VectorView&&) noexcept = default;
+        VectorView& operator=(VectorView&&) noexcept = default;
+
+        ~VectorView() = default;
+
+        explicit constexpr VectorView(const std::array<T*, N>& ptrs) noexcept
+            : m_data(ptrs)
+        {
+            assert_non_null_(m_data);
+        }
+
+        template <typename... Ptrs>
+            requires (sizeof...(Ptrs) == N && (std::same_as<Ptrs, T*> && ...))
+        explicit constexpr VectorView(Ptrs... ptrs) noexcept
+            : m_data{ptrs...}
+        {
+            assert_non_null_pack_(ptrs...);
+        }
+
+        explicit constexpr VectorView(const VectorView<N, std::remove_const_t<T>> & other) noexcept
+            requires (std::is_const_v<T>)
+            : m_data{ }
+        {
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                m_data[i] = other.m_data[i];
+            }
+            assert_non_null_(m_data);
+        }
 
         // --- Helpers ---
 
         [[nodiscard]] constexpr Vector<N, T> as_vector() const
         {
-            return as_vector_impl(std::make_index_sequence<N>{});
+            Vector<N, T> out{};
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                out[i] = *(m_data[i]);
+            }
+            return out;
         }
 
         template <typename U>
             requires std::is_convertible_v<T, U>
-        [[nodiscard]] constexpr Vector<N, U> as_vector_cast() const
+        [[nodiscard]] constexpr Vector<N, U> to_vector() const
         {
-            return as_vector_cast_impl<U>(std::make_index_sequence<N>{});
+            Vector<N, U> out{};
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                out[i] = static_cast<U>(*(m_data[i]));
+            }
+            return out;
         }
 
         template <typename Op>
-            requires (std::invocable<Op, T> && std::is_convertible_v<std::invoke_result_t<Op, T>, T>)
-        constexpr reference apply(Op op)
+            requires (!std::is_const_v<T> && std::invocable<Op&, T> && std::is_convertible_v<std::invoke_result_t<Op&, T>, T>)
+        constexpr self_reference apply(Op && op)
         {
-            return apply_impl(op, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) = std::invoke(op, *(m_data[i]));
+            }
+            return *this;
         }
 
         template <typename Op>
-            requires (std::invocable<Op, T> && std::is_convertible_v<std::invoke_result_t<Op, T>, T>)
-        constexpr reference transform(const VectorView<N, T> & other, Op op)
+            requires (!std::is_const_v<T> && std::invocable<Op&, T, T> && std::is_convertible_v<std::invoke_result_t<Op&, T, T>, T>)
+        constexpr self_reference apply(const VectorView<N, T> & other, Op && op)
         {
-            return transform_impl(other, op, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) = std::invoke(op, *(m_data[i]), *(other.m_data[i]));
+            }
+            return *this;
         }
 
         template <typename U>
-            requires std::is_convertible_v<U, T>
-        constexpr reference fill(U value) {
-            return fill_impl(static_cast<T>(value), std::make_index_sequence<N>{});
+            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+        constexpr self_reference fill(U value)
+        {
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) = static_cast<T>(value);
+            }
+            return *this;
         }
 
         template <typename U>
-            requires std::is_convertible_v<U, T>
-        constexpr reference clamp(U minValue, U maxValue)
+            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+        constexpr self_reference clamp(U minValue, U maxValue)
         {
             const auto min = static_cast<T>(minValue);
             const auto max = static_cast<T>(maxValue);
-            return apply([min, max](T val) {
-                return val < min ? min : (val > max ? max : val);
-            });
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                auto & val = *(m_data[i]);
+                val = val < min ? min : (val > max ? max : val);
+            }
+            return *this;
         }
 
         template <typename Pred>
-            requires std::predicate<Pred, T>
-        [[nodiscard]] constexpr bool all(Pred pred) const
+            requires std::predicate<Pred&, T>
+        [[nodiscard]] constexpr bool all(Pred && pred) const
         {
-            return all_impl(pred, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                if (!static_cast<bool>(std::invoke(pred, *(m_data[i]))))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         template <typename Pred>
-            requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred pred) const
+            requires std::predicate<Pred&, T, T>
+        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred && pred) const
         {
-            return all_impl(other, pred, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                if (!static_cast<bool>(std::invoke(pred, *(m_data[i]), other[i])))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         template <typename Pred>
-            requires std::predicate<Pred, T>
-        [[nodiscard]] constexpr bool any(Pred pred) const
+            requires std::predicate<Pred&, T>
+        [[nodiscard]] constexpr bool any(Pred && pred) const
         {
-            return any_impl(pred, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                if (static_cast<bool>(std::invoke(pred, *(m_data[i]))))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         template <typename Pred>
-            requires std::predicate<Pred, T, T>
-        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred pred) const
+            requires std::predicate<Pred&, T, T>
+        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred && pred) const
         {
-            return any_impl(other, pred, std::make_index_sequence<N>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                if (static_cast<bool>(std::invoke(pred, *(m_data[i]), other[i])))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // --- Named access ---
@@ -109,65 +200,97 @@ namespace math
 
         // --- Basic Arithmetic ---
 
-        constexpr reference add(const VectorView<N, T> & other)
+        constexpr self_reference add(const VectorView<N, T> & other)
+            requires (!std::is_const_v<T>)
         {
-            return transform(other, std::plus<T>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) += other[i];
+            }
+            return *this;
         }
 
-        constexpr reference subtract(const VectorView<N, T> & other)
+        constexpr self_reference subtract(const VectorView<N, T> & other)
+            requires (!std::is_const_v<T>)
         {
-            return transform(other, std::minus<T>{});
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) -= other[i];
+            }
+            return *this;
         }
 
         template <typename U>
-            requires std::is_convertible_v<U, T>
-        constexpr reference multiply(U scalar)
+            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+        constexpr self_reference multiply(U scalar)
         {
             const auto s = static_cast<T>(scalar);
-            return apply([s](T val) { return val * s; });
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) *= s;
+            }
+            return *this;
         }
 
         template <typename U>
-            requires std::is_convertible_v<U, T>
-        constexpr reference divide(U scalar)
+            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+        constexpr self_reference divide(U scalar)
         {
-            const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-            return apply([inv](T val) { return val * inv; });
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    *(m_data[i]) *= inv;
+                }
+            }
+            else
+            {
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    *(m_data[i]) /= static_cast<T>(scalar);
+                }
+            }
+            return *this;
         }
 
         // --- Vector Arithmetic ---
 
         [[nodiscard]] constexpr T dot(const VectorView<N, T> & other) const
         {
-            return dot_impl(other, std::make_index_sequence<N>{});
+            auto out = static_cast<T>(0);
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                out += *(m_data[i]) * other[i];
+            }
+            return out;
         }
 
         // --- Unary ---
 
-        constexpr reference invert()
+        constexpr self_reference invert()
+            requires (!std::is_const_v<T>)
         {
-            return apply([](T val) { return -val; });
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                *(m_data[i]) = -(*(m_data[i]));
+            }
+            return *this;
         }
 
-        [[nodiscard]] constexpr T squaredLength() const
+        [[nodiscard]] constexpr T squared_length() const
         {
-            return squaredLength_impl(std::make_index_sequence<N>{});
+            return dot(*this);
         }
 
         [[nodiscard]] constexpr T length() const
             requires std::floating_point<T>
         {
-            return std::sqrt(squaredLength());
+            return std::sqrt(squared_length());
         }
 
-        [[nodiscard]] constexpr Vector<N, T> normalized() const
-            requires std::floating_point<T>
-        {
-            return *this / length();
-        }
-
-        constexpr reference normalize()
-            requires std::floating_point<T>
+        constexpr self_reference normalize()
+            requires (!std::is_const_v<T> && std::floating_point<T>)
         {
             const auto len = length();
             if (len > epsilon_v<T>)
@@ -184,16 +307,47 @@ namespace math
         // --- Comparison ---
 
         template <typename U>
+            requires (std::is_convertible_v<U, T>)
+        [[nodiscard]] constexpr bool equals(const VectorView<N, U>& other) const noexcept
+        {
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                if (!((*this)[i] == static_cast<T>(other[i])))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        template <typename U>
+            requires (std::is_convertible_v<U, T> && std::floating_point<std::remove_const_t<T>>)
+        [[nodiscard]] constexpr bool near_equals(const VectorView<N, U>& other, std::remove_const_t<T> eps = epsilon_v<std::remove_const_t<T>>) const noexcept
+        {
+            using base_t = std::remove_const_t<T>;
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                const auto a = static_cast<base_t>((*this)[i]);
+                const auto b = static_cast<base_t>(static_cast<T>(other[i]));
+                if (std::abs(a - b) > eps)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        template <typename U>
             requires std::is_convertible_v<U, T>
         [[nodiscard]] bool operator==(const VectorView<N, U> & other) const
         {
             if constexpr (std::is_floating_point_v<T>)
             {
-                return all(other, [](const T & a, const U & b) { return std::abs(a - static_cast<T>(b)) < epsilon_v<T>; });
+                return this->near_equals(other);
             }
             else
             {
-                return all(other, [](const T & a, const U & b) { return a == static_cast<T>(b); });
+                return this->equals(other);
             }
         }
 
@@ -208,11 +362,21 @@ namespace math
 
         [[nodiscard]] constexpr const T & operator[](std::size_t index) const noexcept
         {
-            assert(index < N);
             return *(m_data[index]);
         }
 
         [[nodiscard]] constexpr T & operator[](std::size_t index) noexcept
+        {
+            return *(m_data[index]);
+        }
+
+        [[nodiscard]] constexpr const T & at(std::size_t index) const
+        {
+            assert(index < N);
+            return *(m_data[index]);
+        }
+
+        [[nodiscard]] constexpr T & at(std::size_t index)
         {
             assert(index < N);
             return *(m_data[index]);
@@ -227,81 +391,31 @@ namespace math
 
         template <size_t Index>
             requires (Index < N)
-        [[nodiscard]] constexpr T* get() noexcept
+        [[nodiscard]] constexpr T & get() noexcept
         {
             return *(m_data[Index]);
         }
 
     private:
 
-        template <std::size_t... I>
-        constexpr Vector<N, T> as_vector_impl(std::index_sequence<I...>) const
+        static constexpr void assert_non_null_(const std::array<T*, N> & data) noexcept
         {
-            return Vector<N, T>{ get<I>()... };
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                assert(data[i] != nullptr && "VectorView: null pointer is not allowed");
+            }
         }
 
-        template <typename U, std::size_t... I>
-        constexpr Vector<N, U> as_vector_cast_impl(std::index_sequence<I...>) const
+        static constexpr void assert_ptr_non_null_(const T* p) noexcept
         {
-            return Vector<N, U>{ static_cast<U>(get<I>())... };
+            assert(p != nullptr && "VectorView: null pointer is not allowed");
         }
 
-        template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op, T>, T>
-        constexpr reference apply_impl(Op op, std::index_sequence<I...>)
+        template <typename... Args>
+        static constexpr void assert_non_null_pack_(Args... args) noexcept
         {
-            ((get<I>() = op(get<I>())), ...);
-            return *this;
-        }
-
-        template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op, T, T>, T>
-        constexpr Vector<N, T> transform_impl(const VectorView<N, T> & other, Op op, std::index_sequence<I...>) const
-        {
-            ((get<I>() = op(get<I>(), other.get<I>())), ...);
-            return *this;
-        }
-
-        template <std::size_t... I>
-        constexpr reference fill_impl(T value, std::index_sequence<I...>) {
-            ((get<I>() = static_cast<T>(value)), ...);
-            return *this;
-        }
-
-        template <typename Pred, std::size_t... I>
-        constexpr bool all_impl(Pred pred, std::index_sequence<I...>) const
-        {
-            return (static_cast<bool>(pred(get<I>())) && ...);
-        }
-
-        template <typename Pred, std::size_t... I>
-        constexpr bool all_impl(const VectorView<N, T> & other, Pred pred, std::index_sequence<I...>) const
-        {
-            return (static_cast<bool>(pred(get<I>(), other.get<I>())) && ...);
-        }
-
-        template <typename Pred, std::size_t... I>
-        constexpr bool any_impl(Pred pred, std::index_sequence<I...>) const
-        {
-            return (static_cast<bool>(pred(get<I>())) || ...);
-        }
-
-        template <typename Pred, std::size_t... I>
-        constexpr bool any_impl(const VectorView<N, T> & other, Pred pred, std::index_sequence<I...>) const
-        {
-            return (static_cast<bool>(pred(get<I>(), other.get<I>())) || ...);
-        }
-
-        template <std::size_t... I>
-        constexpr T dot_impl(const VectorView<N, T> & other, std::index_sequence<I...>) const
-        {
-            return ((get<I>() * other.get<I>()) + ...);
-        }
-
-        template <std::size_t... I>
-        constexpr T squaredLength_impl(std::index_sequence<I...>) const
-        {
-            return ((get<I>() * get<I>()) + ...);
+            static_assert(sizeof...(Args) == N);
+            (assert_ptr_non_null_(args), ...);
         }
     };
 

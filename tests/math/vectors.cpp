@@ -35,9 +35,9 @@ TYPED_TEST_SUITE(VecTypedTest, FloatTypes);
 
 // --- Compile-time / type-trait sanity checks (fast, production-friendly) ---
 
-static_assert(Vector2<float>::size == 2);
-static_assert(Vector3<float>::size == 3);
-static_assert(Vector4<float>::size == 4);
+static_assert(Vector2<float>::size() == 2);
+static_assert(Vector3<float>::size() == 3);
+static_assert(Vector4<float>::size() == 4);
 
 // Constructor constraints: only arithmetic Args..., and count must be N.
 static_assert(std::is_constructible_v<Vector2<float>, int, int>);
@@ -119,7 +119,7 @@ TYPED_TEST(VecTypedTest, Apply_MapsEachComponent)
   using T = TypeParam;
 
   const Vector3<T> v(T{1}, T{-2}, T{3});
-  const auto absV = v.apply([](T x)
+  const auto absV = v.transform([](T x)
     { return std::abs(x); });
 
   ExpectVecEqExact(absV, Vector3<T>(T{1}, T{2}, T{3}));
@@ -248,7 +248,7 @@ TYPED_TEST(VecTypedTest, SquaredLengthAndLength_Correct)
   using T = TypeParam;
 
   const Vector2<T> v(T{3}, T{4});
-  EXPECT_NEAR(v.squaredLength(), T{25}, epsilon_v<T> * T{16});
+  EXPECT_NEAR(v.squared_length(), T{25}, epsilon_v<T> * T{16});
   EXPECT_NEAR(v.length(), T{5}, epsilon_v<T> * T{32});
 }
 

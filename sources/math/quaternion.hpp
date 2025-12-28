@@ -41,9 +41,9 @@ namespace math
             return data.length();
         }
 
-        constexpr T squaredLength() const
+        constexpr T squared_length() const
         {
-            return data.squaredLength();
+            return data.squared_length();
         }
 
         Quaternion& normalize()

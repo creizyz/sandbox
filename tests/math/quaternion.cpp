@@ -47,7 +47,7 @@ TYPED_TEST(QuatTypedTest, DefaultConstructor_IsIdentityLike)
 
   // Length of identity quaternion should be 1.
   EXPECT_NEAR(q.length(), T{1}, kTol<T>());
-  EXPECT_NEAR(q.squaredLength(), T{1}, kTol<T>());
+  EXPECT_NEAR(q.squared_length(), T{1}, kTol<T>());
 }
 
 TYPED_TEST(QuatTypedTest, ComponentConstructor_AndAccessors)
@@ -81,7 +81,7 @@ TYPED_TEST(QuatTypedTest, LengthAndSquaredLength_MatchExpectedForSimpleCase)
   using T = TypeParam;
 
   const math::Quaternion<T> q(T{3}, T{4}, T{0}, T{0});
-  EXPECT_NEAR(q.squaredLength(), T{25}, kTol<T>());
+  EXPECT_NEAR(q.squared_length(), T{25}, kTol<T>());
   EXPECT_NEAR(q.length(), T{5}, kTol<T>());
 }
 
@@ -94,7 +94,7 @@ TYPED_TEST(QuatTypedTest, Normalized_ReturnsUnitQuaternion_ForNonZero)
 
   ExpectQuatNear(n, math::Quaternion<T>(T{0}, T{0}, T{0}, T{1}), kTol<T>());
   EXPECT_NEAR(n.length(), T{1}, kTol<T>());
-  EXPECT_NEAR(n.squaredLength(), T{1}, kTol<T>());
+  EXPECT_NEAR(n.squared_length(), T{1}, kTol<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Normalize_InPlace_MakesUnitQuaternion_ForNonZero)
@@ -108,7 +108,7 @@ TYPED_TEST(QuatTypedTest, Normalize_InPlace_MakesUnitQuaternion_ForNonZero)
   q.normalize();
 
   EXPECT_NEAR(q.length(), T{1}, kTol<T>());
-  EXPECT_NEAR(q.squaredLength(), T{1}, kTol<T>());
+  EXPECT_NEAR(q.squared_length(), T{1}, kTol<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Normalize_DoesNotExplodeForNearZero)
@@ -160,7 +160,7 @@ TYPED_TEST(QuatTypedTest, Conjugate_PreservesLength)
   const auto c = q.conjugate();
 
   EXPECT_NEAR(q.length(), c.length(), kTol<T>());
-  EXPECT_NEAR(q.squaredLength(), c.squaredLength(), kTol<T>());
+  EXPECT_NEAR(q.squared_length(), c.squared_length(), kTol<T>());
 }
 
 // --- multiplication: identity, associativity sanity, conjugation relation ---
@@ -238,9 +238,9 @@ TYPED_TEST(QuatTypedTest, SquaredNorm_IsMultiplicative)
 
   const auto ab = a * b;
 
-  const T na2 = a.squaredLength();
-  const T nb2 = b.squaredLength();
-  const T nab2 = ab.squaredLength();
+  const T na2 = a.squared_length();
+  const T nb2 = b.squared_length();
+  const T nab2 = ab.squared_length();
 
   EXPECT_NEAR(nab2, na2 * nb2, kTol<T>() * T{64});
 }
@@ -255,7 +255,7 @@ TYPED_TEST(QuatTypedTest, ProductWithConjugate_IsPureScalarWithSquaredNorm)
   const auto p2 = qc * q;
 
   // q * q* = (0,0,0, ||q||^2)
-  const T n2 = q.squaredLength();
+  const T n2 = q.squared_length();
 
   ExpectQuatNear(p1, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), kTol<T>() * T{64});
   ExpectQuatNear(p2, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), kTol<T>() * T{64});
