@@ -21,6 +21,8 @@ target_include_directories(sandbox PUBLIC sources)
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
 
+set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1)
+
 if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
