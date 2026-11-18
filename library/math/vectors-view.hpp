@@ -399,7 +399,8 @@ namespace math
 
     private:
 
-        static constexpr void assert_non_null(const std::array<T*, N> & data) noexcept
+        // These arguments are used only when assertions are enabled.
+        static constexpr void assert_non_null([[maybe_unused]] const std::array<T*, N> & data) noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -407,7 +408,7 @@ namespace math
             }
         }
 
-        static constexpr void assert_ptr_non_null(const T* p) noexcept
+        static constexpr void assert_ptr_non_null([[maybe_unused]] const T* p) noexcept
         {
             assert(p != nullptr && "VectorView: null pointer is not allowed");
         }

@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+function(sandbox_enable_strict_warnings target)
+    if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
+endfunction()
+
 # ---- Collect Sources ----
 file(GLOB_RECURSE LIB_SOURCES
         CONFIGURE_DEPENDS
@@ -15,6 +23,7 @@ file(GLOB_RECURSE LIB_SOURCES
 
 # ---- Library Target ----
 add_library(sandbox ${LIB_SOURCES})
+sandbox_enable_strict_warnings(sandbox)
 target_compile_features(sandbox PUBLIC cxx_std_23)
 target_include_directories(sandbox PUBLIC library)
 

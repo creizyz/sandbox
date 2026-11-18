@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(google_benchmark)
 
 file(GLOB_RECURSE BENCH_SOURCES CONFIGURE_DEPENDS "*.cpp")
 add_executable(benchmarks_run ${BENCH_SOURCES})
+sandbox_enable_strict_warnings(benchmarks_run)
 
 target_link_libraries(benchmarks_run
         PRIVATE

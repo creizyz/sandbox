@@ -135,9 +135,10 @@ void Value::write_pretty_json_impl(std::ostream & os, Indentation & indentation)
     }, m_data);
 }
 
-Value Value::read_json(std::istream & is) noexcept
+Value Value::read_json(std::istream &) noexcept
 {
-
+    // Stream parsing is still unimplemented.
+    return {};
 }
 
 void Value::write_binary(std::ostream & os) const noexcept

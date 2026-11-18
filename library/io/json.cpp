@@ -188,7 +188,7 @@ Value JsonParser::parse_array(JsonLexer& lexer)
     }
 }
 
-Value JsonParser::parse_object(JsonLexer& lexer)
+Value JsonParser::parse_object(JsonLexer&)
 {
     // if (lexer.peek() == '}') // quick escape
     // {
@@ -264,7 +264,7 @@ Value JsonParser::parse_object(JsonLexer& lexer)
     return {};
 }
 
-Value JsonParser::parse_arithmetic_wrapper(JsonLexer& lexer)
+Value JsonParser::parse_arithmetic_wrapper(JsonLexer&)
 {
     // // We already consumed { "type": "int32"
     // // Expect: , "value": <number> }

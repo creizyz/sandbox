@@ -21,8 +21,8 @@ static void bm_vector2_cross(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        const auto& a = inputs_a[i & 3u];
-        const auto& b = inputs_b[i & 3u];
+        auto& a = inputs_a[i & 3u];
+        auto& b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -52,8 +52,8 @@ static void bm_vector3_cross(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        const auto& a = inputs_a[i & 3u];
-        const auto& b = inputs_b[i & 3u];
+        auto& a = inputs_a[i & 3u];
+        auto& b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -83,8 +83,8 @@ static void bm_vector3_rotate(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        const auto& a = inputs_a[i & 3u];
-        const auto& b = inputs_b[i & 3u];
+        auto& a = inputs_a[i & 3u];
+        auto& b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 

@@ -17,6 +17,7 @@ enable_testing()
 
 file(GLOB_RECURSE TESTS_SOURCES CONFIGURE_DEPENDS "*.cpp")
 add_executable(unit_tests ${TESTS_SOURCES})
+sandbox_enable_strict_warnings(unit_tests)
 
 target_link_libraries(unit_tests
         PRIVATE
