@@ -9,13 +9,13 @@ include(FetchContent)
 # ---- Collect Sources ----
 file(GLOB_RECURSE LIB_SOURCES
         CONFIGURE_DEPENDS
-        "sources/*.cpp"
-        "sources/*.hpp"
+        "library/*.cpp"
+        "library/*.hpp"
 )
 
 # ---- Library Target ----
 add_library(sandbox ${LIB_SOURCES})
-target_include_directories(sandbox PUBLIC sources)
+target_include_directories(sandbox PUBLIC library)
 
 # ---- Modules ----
 option(BUILD_TESTING "Build tests" ON)
