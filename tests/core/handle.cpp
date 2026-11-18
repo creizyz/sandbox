@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -11,20 +12,20 @@
 namespace {
 
 struct AliveInfo {
-    uint32_t index;
-    uint32_t generation;
+    uint32_t m_index;
+    uint32_t m_generation;
 };
 
-void ExpectInvalid(const HandleRegister& reg, Handle h) {
+void expect_invalid(const HandleRegister& reg, Handle h) {
     EXPECT_FALSE(h.is_valid());    // Handle struct-level validity (id != invalid_id)
     EXPECT_FALSE(reg.is_valid(h)); // Register-level validity
     EXPECT_EQ(reg.get_index(h), HandleRegister::invalid_index);
 }
 
-void ExpectValid(const HandleRegister& reg, Handle h, uint32_t expectedIndex) {
+void expect_valid(const HandleRegister& reg, Handle h, uint32_t expected_index) {
     EXPECT_TRUE(h.is_valid());
     EXPECT_TRUE(reg.is_valid(h));
-    EXPECT_EQ(reg.get_index(h), expectedIndex);
+    EXPECT_EQ(reg.get_index(h), expected_index);
 }
 
 class HandleRegisterTest : public ::testing::Test {
@@ -40,13 +41,13 @@ protected:
 
 TEST(HandleSmoke, DefaultHandleIsInvalid) {
     Handle h{};
-    EXPECT_EQ(h.id, Handle::invalid_id);
+    EXPECT_EQ(h.m_id, Handle::invalid_id);
     EXPECT_FALSE(h.is_valid());
 }
 
 TEST_F(HandleRegisterTest, InsertReturnsValidHandleAndMapsToIndex) {
     Handle h = reg.insert(42);
-    ExpectValid(reg, h, 42);
+    expect_valid(reg, h, 42);
 }
 
 TEST_F(HandleRegisterTest, MultipleInsertsAreIndependent) {
@@ -54,32 +55,32 @@ TEST_F(HandleRegisterTest, MultipleInsertsAreIndependent) {
     Handle b = reg.insert(2);
     Handle c = reg.insert(3);
 
-    ExpectValid(reg, a, 1u);
-    ExpectValid(reg, b, 2u);
-    ExpectValid(reg, c, 3u);
+    expect_valid(reg, a, 1u);
+    expect_valid(reg, b, 2u);
+    expect_valid(reg, c, 3u);
 
-    EXPECT_NE(a.id, b.id);
-    EXPECT_NE(a.id, c.id);
-    EXPECT_NE(b.id, c.id);
+    EXPECT_NE(a.m_id, b.m_id);
+    EXPECT_NE(a.m_id, c.m_id);
+    EXPECT_NE(b.m_id, c.m_id);
 }
 
 TEST_F(HandleRegisterTest, UpdateChangesIndexForValidHandle) {
     Handle h = reg.insert(10);
-    ExpectValid(reg, h, 10u);
+    expect_valid(reg, h, 10u);
 
     EXPECT_TRUE(reg.update(h, 99));
-    ExpectValid(reg, h, 99u);
+    expect_valid(reg, h, 99u);
 }
 
 TEST_F(HandleRegisterTest, UpdateFailsForInvalidHandleId) {
     Handle invalid{};
     EXPECT_FALSE(reg.update(invalid, 123));
-    ExpectInvalid(reg, invalid);
+    expect_invalid(reg, invalid);
 }
 
 TEST_F(HandleRegisterTest, EraseInvalidatesHandle) {
     Handle h = reg.insert(5);
-    ExpectValid(reg, h, 5u);
+    expect_valid(reg, h, 5u);
 
     reg.erase(h);
 
@@ -91,22 +92,22 @@ TEST_F(HandleRegisterTest, ReinsertAfterEraseKeepsOldHandleInvalid) {
     Handle h1 = reg.insert(111);
     ASSERT_TRUE(reg.is_valid(h1));
 
-    const uint32_t oldId  = h1.id;
-    const uint32_t oldGen = h1.generation;
+    const uint32_t old_id  = h1.m_id;
+    const uint32_t old_generation = h1.m_generation;
 
     reg.erase(h1);
     EXPECT_FALSE(reg.is_valid(h1));
 
     Handle h2 = reg.insert(222);
-    ExpectValid(reg, h2, 222u);
+    expect_valid(reg, h2, 222u);
 
     // Accept both common implementations:
     // 1) Reuse the same id and bump generation
     // 2) Allocate a fresh id (no reuse)
-    if (h2.id == oldId) {
-        EXPECT_GT(h2.generation, oldGen);
+    if (h2.m_id == old_id) {
+        EXPECT_GT(h2.m_generation, old_generation);
     } else {
-        EXPECT_NE(h2.id, oldId);
+        EXPECT_NE(h2.m_id, old_id);
     }
 
     // Old handle must remain invalid regardless.
@@ -117,44 +118,50 @@ TEST_F(HandleRegisterTest, ReinsertAfterEraseKeepsOldHandleInvalid) {
 TEST_F(HandleRegisterTest, EraseInvalidHandleIsNoopAndDoesNotCrash) {
     Handle invalid{};
     reg.erase(invalid);
-    ExpectInvalid(reg, invalid);
+    expect_invalid(reg, invalid);
 }
 
 TEST_F(HandleRegisterTest, StaleGenerationIsInvalid) {
     Handle h = reg.insert(7);
-    ExpectValid(reg, h, 7u);
+    expect_valid(reg, h, 7u);
 
     Handle stale = h;
-    stale.generation += 1;
+    stale.m_generation += 1;
 
     EXPECT_FALSE(reg.is_valid(stale));
     EXPECT_EQ(reg.get_index(stale), HandleRegister::invalid_index);
 
     // Original still valid.
-    ExpectValid(reg, h, 7u);
+    expect_valid(reg, h, 7u);
 }
 
 TEST_F(HandleRegisterTest, RandomizedOperationsMaintainConsistency) {
     std::mt19937 rng(0xC0FFEEu);
-    std::uniform_int_distribution<int> opDist(0, 2); // 0 insert, 1 update, 2 erase
-    std::uniform_int_distribution<uint32_t> idxDist(0, 100000);
+    std::uniform_int_distribution<int> op_dist(0, 2); // 0 insert, 1 update, 2 erase
+    std::uniform_int_distribution<uint32_t> idx_dist(0, 100000);
 
     std::vector<Handle> handles;
     handles.reserve(2000);
 
-    std::unordered_map<uint32_t, AliveInfo> aliveById; // id -> {index, generation}
+    std::unordered_map<uint32_t, AliveInfo> alive_by_id; // id -> {index, generation}
 
-    auto checkAllAlive = [&] {
+    auto index_is_occupied = [&](uint32_t index) {
+        return std::ranges::any_of(alive_by_id, [index](const auto& entry) {
+            return entry.second.m_index == index;
+        });
+    };
+
+    auto check_all_alive = [&] {
         for (const Handle& h : handles) {
             if (!h.is_valid()) continue;
 
-            auto it = aliveById.find(h.id);
-            const bool shouldBeAlive = (it != aliveById.end() && it->second.generation == h.generation);
+            auto it = alive_by_id.find(h.m_id);
+            const bool should_be_alive = (it != alive_by_id.end() && it->second.m_generation == h.m_generation);
 
-            EXPECT_EQ(reg.is_valid(h), shouldBeAlive);
+            EXPECT_EQ(reg.is_valid(h), should_be_alive);
 
-            if (shouldBeAlive) {
-                EXPECT_EQ(reg.get_index(h), it->second.index);
+            if (should_be_alive) {
+                EXPECT_EQ(reg.get_index(h), it->second.m_index);
             } else {
                 EXPECT_EQ(reg.get_index(h), HandleRegister::invalid_index);
             }
@@ -164,34 +171,42 @@ TEST_F(HandleRegisterTest, RandomizedOperationsMaintainConsistency) {
     for (int step = 0; step < 5000; ++step) {
         SCOPED_TRACE(step);
 
-        const int op = opDist(rng);
+        const int op = op_dist(rng);
 
         if (op == 0 || handles.empty()) {
             // INSERT
-            const uint32_t idx = idxDist(rng);
+            const uint32_t idx = idx_dist(rng);
+            const bool should_insert = !index_is_occupied(idx);
             Handle h = reg.insert(idx);
 
-            ExpectValid(reg, h, idx);
-
-            aliveById[h.id] = AliveInfo{idx, h.generation};
-            handles.push_back(h);
+            if (should_insert) {
+                ASSERT_TRUE(h.is_valid());
+                expect_valid(reg, h, idx);
+                ASSERT_TRUE(alive_by_id.emplace(h.m_id, AliveInfo{idx, h.m_generation}).second);
+                handles.push_back(h);
+            } else {
+                expect_invalid(reg, h);
+            }
         } else {
             // Pick an existing handle (may be stale).
             std::uniform_int_distribution<size_t> pick(0, handles.size() - 1);
             Handle h = handles[pick(rng)];
+            const auto it = alive_by_id.find(h.m_id);
+            const bool is_alive = it != alive_by_id.end() && it->second.m_generation == h.m_generation;
 
             if (op == 1) {
                 // UPDATE
-                const uint32_t newIdx = idxDist(rng);
-                const bool ok = reg.update(h, newIdx);
+                const uint32_t new_index = idx_dist(rng);
+                const bool should_update = is_alive && !index_is_occupied(new_index);
+                ASSERT_EQ(reg.update(h, new_index), should_update);
 
-                const bool isAlive = reg.is_valid(h);
-                EXPECT_EQ(ok, isAlive);
-
-                if (isAlive) {
-                    EXPECT_EQ(reg.get_index(h), newIdx);
-                    aliveById[h.id] = AliveInfo{newIdx, h.generation};
+                if (is_alive) {
+                    if (should_update) {
+                        it->second.m_index = new_index;
+                    }
+                    expect_valid(reg, h, it->second.m_index);
                 } else {
+                    EXPECT_FALSE(reg.is_valid(h));
                     EXPECT_EQ(reg.get_index(h), HandleRegister::invalid_index);
                 }
             } else {
@@ -200,16 +215,14 @@ TEST_F(HandleRegisterTest, RandomizedOperationsMaintainConsistency) {
                 EXPECT_FALSE(reg.is_valid(h));
                 EXPECT_EQ(reg.get_index(h), HandleRegister::invalid_index);
 
-                // If it was alive in the model, remove it.
-                auto it = aliveById.find(h.id);
-                if (it != aliveById.end() && it->second.generation == h.generation) {
-                    aliveById.erase(it);
+                if (is_alive) {
+                    alive_by_id.erase(it);
                 }
             }
         }
 
-        if ((step % 100) == 0) checkAllAlive();
+        if ((step % 100) == 0) check_all_alive();
     }
 
-    checkAllAlive();
+    check_all_alive();
 }

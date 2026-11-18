@@ -87,21 +87,22 @@ namespace math::tests
     TEST(VectorView, ConstructorRejectsNullPointer_DebugDeathTest)
     {
         int a = 1, b = 2;
+        int* null_ptr = nullptr;
 
-        // Pack constructor uses assert_non_null_pack_
+        // Pack constructor uses assert_non_null_pack
         EXPECT_DEATH(
             {
-                VectorView<3, int> v(&a, &b, nullptr);
+                VectorView3<int> v(&a, &b, null_ptr);
                 (void)v;
             },
             "null pointer"
         );
 
-        // Array constructor uses assert_non_null_
+        // Array constructor uses assert_non_null
         std::array<int*, 3> ptrs{&a, &b, nullptr};
         EXPECT_DEATH(
             {
-                VectorView<3, int> v(ptrs);
+                VectorView3<int> v(ptrs);
                 (void)v;
             },
             "null pointer"
