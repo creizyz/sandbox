@@ -1,5 +1,8 @@
 #include "json.hpp"
 
+#include "detail/number.hpp"
+#include "detail/utf8.hpp"
+
 #include <cstdint>
 #include <istream>
 #include <iterator>
@@ -13,111 +16,6 @@ namespace io
     {
         constexpr std::size_t max_depth = 256;
         constexpr std::string_view hex_digits = "0123456789abcdef";
-
-        constexpr bool is_digit(char c)
-        {
-            return c >= '0' && c <= '9';
-        }
-
-        bool scan_number(std::string_view input, std::size_t &pos)
-        {
-            const auto peek = [&]
-            { return pos < input.size() ? input[pos] : '\0'; };
-            const auto consume_digits = [&]
-            {
-                const auto start = pos;
-                while (is_digit(peek()))
-                {
-                    ++pos;
-                }
-                return pos != start;
-            };
-
-            if (peek() == '-')
-            {
-                ++pos;
-            }
-            if (peek() == '0')
-            {
-                ++pos;
-            }
-            else if (!consume_digits())
-            {
-                return false;
-            }
-            if (peek() == '.')
-            {
-                ++pos;
-                if (!consume_digits())
-                {
-                    return false;
-                }
-            }
-            if (peek() == 'e' || peek() == 'E')
-            {
-                ++pos;
-                if (peek() == '+' || peek() == '-')
-                {
-                    ++pos;
-                }
-                return consume_digits();
-            }
-            return true;
-        }
-
-        constexpr bool is_surrogate(std::uint32_t code_point)
-        {
-            return code_point >= 0xd800 && code_point <= 0xdfff;
-        }
-
-        // The input starts with a non-ASCII byte. Zero indicates malformed UTF-8.
-        std::size_t utf8_length(std::string_view input)
-        {
-            const auto lead = static_cast<unsigned char>(input.front());
-            std::size_t length;
-            std::uint32_t code_point;
-            std::uint32_t minimum;
-            if (lead >= 0xc2 && lead <= 0xdf)
-            {
-                length = 2;
-                code_point = lead & 0x1f;
-                minimum = 0x80;
-            }
-            else if (lead >= 0xe0 && lead <= 0xef)
-            {
-                length = 3;
-                code_point = lead & 0x0f;
-                minimum = 0x800;
-            }
-            else if (lead >= 0xf0 && lead <= 0xf4)
-            {
-                length = 4;
-                code_point = lead & 0x07;
-                minimum = 0x10000;
-            }
-            else
-            {
-                return 0;
-            }
-            if (input.size() < length)
-            {
-                return 0;
-            }
-            for (std::size_t i = 1; i < length; ++i)
-            {
-                const auto byte = static_cast<unsigned char>(input[i]);
-                if ((byte & 0xc0) != 0x80)
-                {
-                    return 0;
-                }
-                code_point = (code_point << 6) | (byte & 0x3f);
-            }
-            if (code_point < minimum || code_point > 0x10ffff || is_surrogate(code_point))
-            {
-                return 0;
-            }
-            return length;
-        }
 
         void append_utf8(std::string &output, std::uint32_t code_point)
         {
@@ -157,7 +55,7 @@ namespace io
             {
             }
 
-            std::expected<JsonValue, JsonError> parse()
+            std::expected<DocumentValue, JsonError> parse()
             {
                 auto value = parse_value(0);
                 if (!value)
@@ -237,7 +135,7 @@ namespace io
                 return std::nullopt;
             }
 
-            std::expected<JsonValue, JsonError> parse_value(std::size_t depth)
+            std::expected<DocumentValue, JsonError> parse_value(std::size_t depth)
             {
                 if (auto failure = skip_trivia())
                 {
@@ -255,43 +153,43 @@ namespace io
                 if (first == '"')
                 {
                     return parse_string().transform([](std::string &&text)
-                                                    { return JsonValue{std::move(text)}; });
+                                                    { return DocumentValue{std::move(text)}; });
                 }
                 if (consume("null"))
                 {
-                    return JsonValue{};
+                    return DocumentValue{};
                 }
                 if (consume("true"))
                 {
-                    return JsonValue{true};
+                    return DocumentValue{true};
                 }
                 if (consume("false"))
                 {
-                    return JsonValue{false};
+                    return DocumentValue{false};
                 }
-                if (first == '-' || is_digit(first))
+                if (first == '-' || detail::is_digit(first))
                 {
                     const auto start = m_pos;
-                    if (!scan_number(m_input, m_pos))
+                    if (!detail::scan_number(m_input, m_pos))
                     {
                         return error("invalid number");
                     }
-                    return JsonValue{JsonNumber{std::string(m_input.substr(start, m_pos - start))}};
+                    return DocumentValue{Number{std::string(m_input.substr(start, m_pos - start))}};
                 }
                 return error("expected a JSON value");
             }
 
-            std::expected<JsonValue, JsonError> parse_array(std::size_t depth)
+            std::expected<DocumentValue, JsonError> parse_array(std::size_t depth)
             {
                 ++m_pos;
-                JsonValue::Array array;
+                DocumentValue::Array array;
                 if (auto failure = skip_trivia())
                 {
                     return std::unexpected(*failure);
                 }
                 if (consume("]"))
                 {
-                    return JsonValue{std::move(array)};
+                    return DocumentValue{std::move(array)};
                 }
                 while (true)
                 {
@@ -307,7 +205,7 @@ namespace io
                     }
                     if (consume("]"))
                     {
-                        return JsonValue{std::move(array)};
+                        return DocumentValue{std::move(array)};
                     }
                     if (!consume(","))
                     {
@@ -316,17 +214,17 @@ namespace io
                 }
             }
 
-            std::expected<JsonValue, JsonError> parse_object(std::size_t depth)
+            std::expected<DocumentValue, JsonError> parse_object(std::size_t depth)
             {
                 ++m_pos;
-                JsonValue::Object object;
+                DocumentValue::Object object;
                 if (auto failure = skip_trivia())
                 {
                     return std::unexpected(*failure);
                 }
                 if (consume("}"))
                 {
-                    return JsonValue{std::move(object)};
+                    return DocumentValue{std::move(object)};
                 }
                 while (true)
                 {
@@ -359,7 +257,7 @@ namespace io
                     }
                     if (consume("}"))
                     {
-                        return JsonValue{std::move(object)};
+                        return DocumentValue{std::move(object)};
                     }
                     if (!consume(","))
                     {
@@ -402,7 +300,7 @@ namespace io
                     }
                     else
                     {
-                        const auto length = utf8_length(m_input.substr(m_pos));
+                        const auto length = detail::utf8_length(m_input.substr(m_pos));
                         if (length == 0)
                         {
                             return error("invalid UTF-8");
@@ -467,7 +365,7 @@ namespace io
             std::expected<std::uint32_t, JsonError> parse_unicode_escape()
             {
                 auto first = parse_hex_quad();
-                if (!first || !is_surrogate(*first))
+                if (!first || !detail::is_surrogate(*first))
                 {
                     return first;
                 }
@@ -496,7 +394,7 @@ namespace io
             {
             }
 
-            std::expected<std::string, JsonError> write(const JsonValue &value)
+            std::expected<std::string, JsonError> write(const DocumentValue &value)
             {
                 if (auto result = write_value(value, 0); !result)
                 {
@@ -509,7 +407,7 @@ namespace io
             bool m_pretty;
             std::string m_output;
 
-            std::expected<void, JsonError> write_value(const JsonValue &value, std::size_t depth)
+            std::expected<void, JsonError> write_value(const DocumentValue &value, std::size_t depth)
             {
                 return std::visit([&](const auto &item) -> std::expected<void, JsonError>
                                   {
@@ -522,10 +420,10 @@ namespace io
                     {
                         m_output += item ? "true" : "false";
                     }
-                    else if constexpr (std::is_same_v<T, JsonNumber>)
+                    else if constexpr (std::is_same_v<T, Number>)
                     {
                         std::size_t pos = 0;
-                        if (!scan_number(item.m_text, pos) || pos != item.m_text.size())
+                        if (!detail::scan_number(item.m_text, pos) || pos != item.m_text.size())
                         {
                             return std::unexpected(JsonError{"invalid number", std::nullopt});
                         }
@@ -545,7 +443,7 @@ namespace io
             template <typename Collection>
             std::expected<void, JsonError> write_collection(const Collection &values, std::size_t depth)
             {
-                constexpr bool is_object = std::is_same_v<Collection, JsonValue::Object>;
+                constexpr bool is_object = std::is_same_v<Collection, DocumentValue::Object>;
                 if (depth == max_depth)
                 {
                     return std::unexpected(JsonError{"nesting limit exceeded", std::nullopt});
@@ -602,7 +500,7 @@ namespace io
                     const auto byte = static_cast<unsigned char>(text[pos]);
                     if (byte >= 0x80)
                     {
-                        const auto length = utf8_length(text.substr(pos));
+                        const auto length = detail::utf8_length(text.substr(pos));
                         if (length == 0)
                         {
                             return std::unexpected(JsonError{"invalid UTF-8", std::nullopt});
@@ -634,12 +532,12 @@ namespace io
         };
     }
 
-    std::expected<JsonValue, JsonError> parse_json(std::string_view input)
+    std::expected<DocumentValue, JsonError> parse_json(std::string_view input)
     {
         return Parser{input}.parse();
     }
 
-    std::expected<JsonValue, JsonError> read_json(std::istream &input)
+    std::expected<DocumentValue, JsonError> read_json(std::istream &input)
     {
         try
         {
@@ -659,12 +557,12 @@ namespace io
         return std::unexpected(JsonError{"failed to read JSON stream", std::nullopt});
     }
 
-    std::expected<std::string, JsonError> write_json(const JsonValue &value, bool pretty)
+    std::expected<std::string, JsonError> write_json(const DocumentValue &value, bool pretty)
     {
         return Writer{pretty}.write(value);
     }
 
-    std::expected<void, JsonError> write_json(std::ostream &output, const JsonValue &value, bool pretty)
+    std::expected<void, JsonError> write_json(std::ostream &output, const DocumentValue &value, bool pretty)
     {
         auto text = write_json(value, pretty);
         if (!text)

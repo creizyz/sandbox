@@ -9,8 +9,8 @@ and the [guidelines](../guidelines/README.md) provide reusable engineering stand
 | Space | Responsibility | Current scope |
 | --- | --- | --- |
 | [`app/`](../app/) | Application entry point, integration, and application-specific behavior | Reserved for the future application |
-| [`library/`](../library/) | Reusable algorithms, data structures, and utilities | The `sandbox` CMake target contains fixed-size math, handles, worker-thread scheduling, JSON I/O, binary serialization experiments, and string helpers |
-| [`tests/`](../tests/) | Correctness and regression evidence | GoogleTest suites for vectors, vector views, quaternions, handles, and JSON I/O |
+| [`library/`](../library/) | Reusable algorithms, data structures, and utilities | The `sandbox` CMake target contains fixed-size math, handles, worker-thread scheduling, JSON and YAML I/O, binary serialization experiments, and string helpers |
+| [`tests/`](../tests/) | Correctness and regression evidence | GoogleTest suites for vectors, vector views, quaternions, handles, and JSON and YAML I/O |
 | [`benchmarks/`](../benchmarks/) | Performance experiments and supporting measurements | Google Benchmark microbenchmarks for vector and geometry operations |
 
 The app, tests, and benchmarks consume the library. Keep the library independent of those
@@ -37,6 +37,8 @@ Number documents within each section using two-digit prefixes, starting at `01`.
 | --- | --- |
 | Write or review C++ and check API maturity | [C++ conventions and API maturity](development/01-cpp-conventions.md) |
 | Read or write JSON, including comment and number handling | [JSON I/O](../library/io/docs/01-json.md) |
+| Read or write portable YAML configuration documents | [YAML I/O](../library/io/docs/02-yaml.md) |
+| Convert JSON or YAML values to and from core values | [Document values and core conversion](../library/io/docs/03-document-value.md) |
 | Configure, build, format changed files, export compile commands, run tests, or run benchmarks | [Build and validation](development/02-build-and-validation.md) |
 | Record or review an architectural decision | [Architecture decision records](adr/README.md) |
 | Select an agent procedure for a recurring task | [Repository skills](#repository-skills) |

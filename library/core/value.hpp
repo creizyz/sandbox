@@ -24,7 +24,8 @@ public:
         float, double,
         std::string,
         Array,
-        Object>;
+        Object,
+        bool>;
 
 private:
     Data m_data;

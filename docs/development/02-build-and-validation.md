@@ -1,6 +1,6 @@
 # Build and validation
 
-The project uses CMake and C++23. One verified environment is WSL Ubuntu with GCC 15.2,
+The project uses CMake and C++23, with a C compiler for LibYAML. One verified environment is WSL Ubuntu with GCC 15.2,
 CMake 4.2.3, and Ninja. The root configuration defines the `sandbox` library. `app/` is reserved
 for a future executable.
 
@@ -13,7 +13,8 @@ cmake --build cmake-build-release --target unit_tests benchmarks_run
 
 `BUILD_TESTING` and `BUILD_BENCHMARKS` default to `ON`. They enable GoogleTest and Google
 Benchmark respectively. Both dependencies are fetched by CMake from their upstream `main`
-branches. For a library-only build, configure with
+branches. The library's YAML codec uses LibYAML, which CMake fetches from a pinned release
+with a verified archive checksum. For a library-only build, configure with
 `-DBUILD_TESTING=OFF -DBUILD_BENCHMARKS=OFF` and build the `sandbox` target.
 
 Sandbox targets treat warnings as errors in every build configuration. GCC and Clang use

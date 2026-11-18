@@ -16,6 +16,11 @@ void Value::write_binary(std::ostream &os) const noexcept
         {
             return; // nothing to write
         }
+        else if constexpr (std::is_same_v<T, bool>)
+        {
+            const uint8_t byte = arg ? 1 : 0;
+            os.write(reinterpret_cast<const char *>(&byte), sizeof(byte));
+        }
         else if constexpr (std::is_arithmetic_v<T>)
         {
             os.write(reinterpret_cast<const char*>(&arg), sizeof(T));
@@ -131,6 +136,15 @@ Value Value::read_binary(std::istream &is) noexcept
             obj.emplace(key, read_binary(is));
         }
         value.m_data = std::move(obj);
+        break;
+    }
+    case 12:
+    {
+        uint8_t byte = 0;
+        if (is.read(reinterpret_cast<char *>(&byte), sizeof(byte)) && byte <= 1)
+        {
+            value.m_data = byte == 1;
+        }
         break;
     }
     default: /* do nothing */
