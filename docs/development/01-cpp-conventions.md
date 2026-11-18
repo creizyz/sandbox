@@ -26,7 +26,7 @@ its evidence evolve.
 | **Experimental** | The interface or behavior is still evolving. Review changes against current consumers and update them as needed. |
 | **Unclassified** | A stability decision is pending. Consult the owning API's documentation before relying on compatibility. |
 
-`Matrix`, `VectorSoa`, quaternion `slerp`, and the `Value` serialization and JSON parsing APIs
+`Matrix`, `VectorSoa`, quaternion `slerp`, the `Value` binary serialization API, and the JSON I/O APIs
 are experimental. Stable designations are pending review of individual contracts and their
 verification. Coverage informs that review. Record status changes alongside the affected contract.
 

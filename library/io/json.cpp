@@ -1,311 +1,692 @@
 #include "json.hpp"
 
-#include <charconv>
+#include <cstdint>
+#include <istream>
+#include <iterator>
+#include <ostream>
+#include <type_traits>
+#include <utility>
 
-#include "helpers/strings.hpp"
-
-constexpr std::string_view LEXER_UNEXPECTED_CHAR = "unexpected character";
-constexpr std::string_view LEXER_UNEXPECTED_EOF  = "unexpected EOF";
-
-JsonLexer::JsonLexer(std::string_view source)
-    : m_ptr(source.data())
-    , m_start(source.data())
-    , m_end(source.data() + source.size())
-{ }
-
-Token JsonLexer::next() noexcept
+namespace io
 {
-    skip_whitespace();
-    if (m_ptr == m_end)
+    namespace
     {
-        return { TokenType::Eof, {}, position() };
-    }
+        constexpr std::size_t max_depth = 256;
+        constexpr std::string_view hex_digits = "0123456789abcdef";
 
-    switch (const char c = *m_ptr)
-    {
-        case '{': ++m_ptr; return { TokenType::LBrace,   "{", position() - 1 };
-        case '}': ++m_ptr; return { TokenType::RBrace,   "}", position() - 1 };
-        case '[': ++m_ptr; return { TokenType::LBracket, "[", position() - 1 };
-        case ']': ++m_ptr; return { TokenType::RBracket, "]", position() - 1 };
-        case ':': ++m_ptr; return { TokenType::Colon,    ":", position() - 1 };
-        case ',': ++m_ptr; return { TokenType::Comma,    ",", position() - 1 };
-        case '"': return scan_string();
-        case 'n':
+        constexpr bool is_digit(char c)
+        {
+            return c >= '0' && c <= '9';
+        }
+
+        bool scan_number(std::string_view input, std::size_t &pos)
+        {
+            const auto peek = [&]
+            { return pos < input.size() ? input[pos] : '\0'; };
+            const auto consume_digits = [&]
             {
-                if (remaining() >= 4 && std::string_view(m_ptr, 4) == "null")
+                const auto start = pos;
+                while (is_digit(peek()))
                 {
-                    m_ptr += 4;
-                    return { TokenType::Null, "null", position() };
+                    ++pos;
                 }
-                return { TokenType::Error, LEXER_UNEXPECTED_CHAR, position() };
-            }
-        default:
+                return pos != start;
+            };
+
+            if (peek() == '-')
             {
-                if (c == '-' || c == '.' || std::isdigit(c))
+                ++pos;
+            }
+            if (peek() == '0')
+            {
+                ++pos;
+            }
+            else if (!consume_digits())
+            {
+                return false;
+            }
+            if (peek() == '.')
+            {
+                ++pos;
+                if (!consume_digits())
                 {
-                    return scan_number();
+                    return false;
                 }
-                return { TokenType::Error, LEXER_UNEXPECTED_CHAR, position() };
             }
-    }
-}
-
-char JsonLexer::peek() noexcept
-{
-    skip_whitespace();
-    return (m_ptr == m_end) ? '\0' : *m_ptr;
-}
-
-void JsonLexer::skip_whitespace() noexcept
-{
-    while (m_ptr < m_end && std::isspace(*m_ptr))
-    {
-        ++m_ptr;
-    }
-}
-
-Token JsonLexer::scan_string() noexcept
-{
-    const auto start = ++m_ptr; // skip opening quote
-    while (m_ptr < m_end)
-    {
-        const char c = *m_ptr;
-        if (c == '"')
-        {
-            ++m_ptr; // consume closing quote
-            const auto length = m_ptr - start - 1;
-            return { TokenType::String, std::string_view(start, length), position() - length };
-        }
-        if (c == '\\')
-        {
-            ++m_ptr; // consume the escape mark
-            if (m_ptr < m_end)
+            if (peek() == 'e' || peek() == 'E')
             {
-                ++m_ptr; // consume the escaped char
+                ++pos;
+                if (peek() == '+' || peek() == '-')
+                {
+                    ++pos;
+                }
+                return consume_digits();
             }
+            return true;
         }
-        else
+
+        constexpr bool is_surrogate(std::uint32_t code_point)
         {
-            ++m_ptr; // consume char
+            return code_point >= 0xd800 && code_point <= 0xdfff;
         }
-    }
-    return { TokenType::Error, LEXER_UNEXPECTED_EOF, position() }; // EOF reached before closing quote
-}
 
-Token JsonLexer::scan_number() noexcept
-{
-    const auto start = m_ptr;
-    if (*m_ptr == '-')
-    {
-        ++m_ptr; // consume negative mark
-    }
-
-    while (m_ptr < m_end && std::isdigit(*m_ptr))
-    {
-        ++m_ptr; // consume digits
-    }
-
-    if (m_ptr < m_end && *m_ptr == '.')
-    {
-        ++m_ptr; // consume float mark
-        while (m_ptr < m_end && std::isdigit(*m_ptr))
+        // The input starts with a non-ASCII byte. Zero indicates malformed UTF-8.
+        std::size_t utf8_length(std::string_view input)
         {
-            ++m_ptr; // consume digits
-        }
-    }
-
-    const auto length = m_ptr - start;
-    return { TokenType::Number, std::string_view(start, length), position() - length };
-}
-
-Value JsonParser::parse(std::string_view sv)
-{
-    if (sv.empty())
-    {
-        return {};
-    }
-
-    JsonLexer lexer{ sv };
-    return parse_recursive(lexer);
-}
-
-Value JsonParser::parse_recursive(JsonLexer& lexer)
-{
-    const auto token = lexer.next();
-
-    switch (token.m_type)
-    {
-        case TokenType::Null:     return {};
-        case TokenType::String:   return Value{ str::unescape(token.m_text) };
-        case TokenType::LBrace:   return parse_object(lexer);
-        case TokenType::LBracket: return parse_array(lexer);
-        case TokenType::Number:
-        {
-            auto value = 0.0;
-            const auto [_, error] = std::from_chars(
-                token.m_text.data(),
-                token.m_text.data() + token.m_text.size(),
-                value
-            );
-
-            if (error != std::errc())
+            const auto lead = static_cast<unsigned char>(input.front());
+            std::size_t length;
+            std::uint32_t code_point;
+            std::uint32_t minimum;
+            if (lead >= 0xc2 && lead <= 0xdf)
             {
-                return {}; // ERROR
+                length = 2;
+                code_point = lead & 0x1f;
+                minimum = 0x80;
+            }
+            else if (lead >= 0xe0 && lead <= 0xef)
+            {
+                length = 3;
+                code_point = lead & 0x0f;
+                minimum = 0x800;
+            }
+            else if (lead >= 0xf0 && lead <= 0xf4)
+            {
+                length = 4;
+                code_point = lead & 0x07;
+                minimum = 0x10000;
+            }
+            else
+            {
+                return 0;
+            }
+            if (input.size() < length)
+            {
+                return 0;
+            }
+            for (std::size_t i = 1; i < length; ++i)
+            {
+                const auto byte = static_cast<unsigned char>(input[i]);
+                if ((byte & 0xc0) != 0x80)
+                {
+                    return 0;
+                }
+                code_point = (code_point << 6) | (byte & 0x3f);
+            }
+            if (code_point < minimum || code_point > 0x10ffff || is_surrogate(code_point))
+            {
+                return 0;
+            }
+            return length;
+        }
+
+        void append_utf8(std::string &output, std::uint32_t code_point)
+        {
+            if (code_point < 0x80)
+            {
+                output += static_cast<char>(code_point);
+                return;
             }
 
-            return Value{ value };
+            const auto append_continuation = [&](std::uint32_t shift)
+            {
+                output += static_cast<char>(0x80 | ((code_point >> shift) & 0x3f));
+            };
+            if (code_point >= 0x10000)
+            {
+                output += static_cast<char>(0xf0 | (code_point >> 18));
+                append_continuation(12);
+                append_continuation(6);
+            }
+            else if (code_point >= 0x800)
+            {
+                output += static_cast<char>(0xe0 | (code_point >> 12));
+                append_continuation(6);
+            }
+            else
+            {
+                output += static_cast<char>(0xc0 | (code_point >> 6));
+            }
+            append_continuation(0);
         }
-        default: return {}; // ERROR
-    }
-}
 
-Value JsonParser::parse_array(JsonLexer& lexer)
-{
-    if (lexer.peek() == ']') // quick escape
-    {
-        lexer.next(); // consume closing bracket
-        return Value::array();
-    }
-
-    auto acc = Value::Array{ };
-    while (true)
-    {
-        // parse value
-        const auto value = parse_recursive(lexer);
-        if (!value.empty())
+        class Parser
         {
-            acc.push_back(std::move(value));
-        }
+        public:
+            explicit Parser(std::string_view input)
+                : m_input{input}
+            {
+            }
 
-        // check for separator or end of array
-        auto next = lexer.next();
-        switch (next.m_type)
+            std::expected<JsonValue, JsonError> parse()
+            {
+                auto value = parse_value(0);
+                if (!value)
+                {
+                    return value;
+                }
+                if (auto failure = skip_trivia())
+                {
+                    return std::unexpected(*failure);
+                }
+                if (m_pos != m_input.size())
+                {
+                    return error("unexpected trailing input");
+                }
+                return value;
+            }
+
+        private:
+            std::string_view m_input;
+            std::size_t m_pos = 0;
+
+            char peek() const
+            {
+                return m_pos < m_input.size() ? m_input[m_pos] : '\0';
+            }
+
+            bool consume(std::string_view token)
+            {
+                if (!m_input.substr(m_pos).starts_with(token))
+                {
+                    return false;
+                }
+                m_pos += token.size();
+                return true;
+            }
+
+            std::unexpected<JsonError> error(std::string_view message) const
+            {
+                return std::unexpected(JsonError{message, m_pos});
+            }
+
+            std::optional<JsonError> skip_trivia()
+            {
+                while (m_pos < m_input.size())
+                {
+                    switch (peek())
+                    {
+                    case ' ':
+                    case '\t':
+                    case '\r':
+                    case '\n':
+                        ++m_pos;
+                        continue;
+                    default:
+                        break;
+                    }
+                    const auto start = m_pos;
+                    if (consume("//"))
+                    {
+                        const auto end = m_input.find_first_of("\r\n", m_pos);
+                        m_pos = end == std::string_view::npos ? m_input.size() : end;
+                    }
+                    else if (consume("/*"))
+                    {
+                        const auto end = m_input.find("*/", m_pos);
+                        if (end == std::string_view::npos)
+                        {
+                            return JsonError{"unterminated block comment", start};
+                        }
+                        m_pos = end + 2;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                return std::nullopt;
+            }
+
+            std::expected<JsonValue, JsonError> parse_value(std::size_t depth)
+            {
+                if (auto failure = skip_trivia())
+                {
+                    return std::unexpected(*failure);
+                }
+                const auto first = peek();
+                if (first == '{' || first == '[')
+                {
+                    if (depth == max_depth)
+                    {
+                        return error("nesting limit exceeded");
+                    }
+                    return first == '{' ? parse_object(depth + 1) : parse_array(depth + 1);
+                }
+                if (first == '"')
+                {
+                    return parse_string().transform([](std::string &&text)
+                                                    { return JsonValue{std::move(text)}; });
+                }
+                if (consume("null"))
+                {
+                    return JsonValue{};
+                }
+                if (consume("true"))
+                {
+                    return JsonValue{true};
+                }
+                if (consume("false"))
+                {
+                    return JsonValue{false};
+                }
+                if (first == '-' || is_digit(first))
+                {
+                    const auto start = m_pos;
+                    if (!scan_number(m_input, m_pos))
+                    {
+                        return error("invalid number");
+                    }
+                    return JsonValue{JsonNumber{std::string(m_input.substr(start, m_pos - start))}};
+                }
+                return error("expected a JSON value");
+            }
+
+            std::expected<JsonValue, JsonError> parse_array(std::size_t depth)
+            {
+                ++m_pos;
+                JsonValue::Array array;
+                if (auto failure = skip_trivia())
+                {
+                    return std::unexpected(*failure);
+                }
+                if (consume("]"))
+                {
+                    return JsonValue{std::move(array)};
+                }
+                while (true)
+                {
+                    auto value = parse_value(depth);
+                    if (!value)
+                    {
+                        return std::unexpected(value.error());
+                    }
+                    array.push_back(std::move(*value));
+                    if (auto failure = skip_trivia())
+                    {
+                        return std::unexpected(*failure);
+                    }
+                    if (consume("]"))
+                    {
+                        return JsonValue{std::move(array)};
+                    }
+                    if (!consume(","))
+                    {
+                        return error("expected ',' or ']'");
+                    }
+                }
+            }
+
+            std::expected<JsonValue, JsonError> parse_object(std::size_t depth)
+            {
+                ++m_pos;
+                JsonValue::Object object;
+                if (auto failure = skip_trivia())
+                {
+                    return std::unexpected(*failure);
+                }
+                if (consume("}"))
+                {
+                    return JsonValue{std::move(object)};
+                }
+                while (true)
+                {
+                    if (peek() != '"')
+                    {
+                        return error("expected an object key");
+                    }
+                    auto key = parse_string();
+                    if (!key)
+                    {
+                        return std::unexpected(key.error());
+                    }
+                    if (auto failure = skip_trivia())
+                    {
+                        return std::unexpected(*failure);
+                    }
+                    if (!consume(":"))
+                    {
+                        return error("expected ':'");
+                    }
+                    auto value = parse_value(depth);
+                    if (!value)
+                    {
+                        return std::unexpected(value.error());
+                    }
+                    object.insert_or_assign(std::move(*key), std::move(*value));
+                    if (auto failure = skip_trivia())
+                    {
+                        return std::unexpected(*failure);
+                    }
+                    if (consume("}"))
+                    {
+                        return JsonValue{std::move(object)};
+                    }
+                    if (!consume(","))
+                    {
+                        return error("expected ',' or '}'");
+                    }
+                    if (auto failure = skip_trivia())
+                    {
+                        return std::unexpected(*failure);
+                    }
+                }
+            }
+
+            std::expected<std::string, JsonError> parse_string()
+            {
+                ++m_pos;
+                std::string text;
+                while (m_pos < m_input.size())
+                {
+                    const auto byte = static_cast<unsigned char>(peek());
+                    if (consume("\""))
+                    {
+                        return text;
+                    }
+                    if (consume("\\"))
+                    {
+                        auto code_point = parse_escape();
+                        if (!code_point)
+                        {
+                            return std::unexpected(code_point.error());
+                        }
+                        append_utf8(text, *code_point);
+                    }
+                    else if (byte < 0x20)
+                    {
+                        return error("unescaped control character");
+                    }
+                    else if (byte < 0x80)
+                    {
+                        text += m_input[m_pos++];
+                    }
+                    else
+                    {
+                        const auto length = utf8_length(m_input.substr(m_pos));
+                        if (length == 0)
+                        {
+                            return error("invalid UTF-8");
+                        }
+                        text.append(m_input.substr(m_pos, length));
+                        m_pos += length;
+                    }
+                }
+                return error("unterminated string");
+            }
+
+            std::expected<std::uint32_t, JsonError> parse_escape()
+            {
+                if (m_pos == m_input.size())
+                {
+                    return error("incomplete escape");
+                }
+                switch (m_input[m_pos++])
+                {
+                case '"':
+                    return '"';
+                case '\\':
+                    return '\\';
+                case '/':
+                    return '/';
+                case 'b':
+                    return '\b';
+                case 'f':
+                    return '\f';
+                case 'n':
+                    return '\n';
+                case 'r':
+                    return '\r';
+                case 't':
+                    return '\t';
+                case 'u':
+                    return parse_unicode_escape();
+                default:
+                    --m_pos;
+                    return error("invalid string escape");
+                }
+            }
+
+            std::expected<std::uint32_t, JsonError> parse_hex_quad()
+            {
+                std::uint32_t value = 0;
+                for (int i = 0; i < 4; ++i)
+                {
+                    const auto c = peek();
+                    const auto lower = c >= 'A' && c <= 'F' ? static_cast<char>(c - 'A' + 'a') : c;
+                    const auto digit = hex_digits.find(lower);
+                    if (digit == std::string_view::npos)
+                    {
+                        return error("invalid Unicode escape");
+                    }
+                    value = (value << 4) | static_cast<std::uint32_t>(digit);
+                    ++m_pos;
+                }
+                return value;
+            }
+
+            std::expected<std::uint32_t, JsonError> parse_unicode_escape()
+            {
+                auto first = parse_hex_quad();
+                if (!first || !is_surrogate(*first))
+                {
+                    return first;
+                }
+                if (*first >= 0xdc00 || !consume("\\u"))
+                {
+                    return error("unpaired Unicode surrogate");
+                }
+                auto second = parse_hex_quad();
+                if (!second)
+                {
+                    return second;
+                }
+                if (*second < 0xdc00 || *second > 0xdfff)
+                {
+                    return error("unpaired Unicode surrogate");
+                }
+                return 0x10000 + ((*first - 0xd800) << 10) + (*second - 0xdc00);
+            }
+        };
+
+        class Writer
         {
-            case TokenType::Comma: /* continue reading */ break;
-            case TokenType::RBracket: return Value{ acc };
-            default: return {}; // ERROR
-        }
+        public:
+            explicit Writer(bool pretty)
+                : m_pretty{pretty}
+            {
+            }
+
+            std::expected<std::string, JsonError> write(const JsonValue &value)
+            {
+                if (auto result = write_value(value, 0); !result)
+                {
+                    return std::unexpected(result.error());
+                }
+                return std::move(m_output);
+            }
+
+        private:
+            bool m_pretty;
+            std::string m_output;
+
+            std::expected<void, JsonError> write_value(const JsonValue &value, std::size_t depth)
+            {
+                return std::visit([&](const auto &item) -> std::expected<void, JsonError>
+                                  {
+                    using T = std::decay_t<decltype(item)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>)
+                    {
+                        m_output += "null";
+                    }
+                    else if constexpr (std::is_same_v<T, bool>)
+                    {
+                        m_output += item ? "true" : "false";
+                    }
+                    else if constexpr (std::is_same_v<T, JsonNumber>)
+                    {
+                        std::size_t pos = 0;
+                        if (!scan_number(item.m_text, pos) || pos != item.m_text.size())
+                        {
+                            return std::unexpected(JsonError{"invalid number", std::nullopt});
+                        }
+                        m_output += item.m_text;
+                    }
+                    else if constexpr (std::is_same_v<T, std::string>)
+                    {
+                        return write_string(item);
+                    }
+                    else
+                    {
+                        return write_collection(item, depth);
+                    }
+                    return {}; }, value.m_data);
+            }
+
+            template <typename Collection>
+            std::expected<void, JsonError> write_collection(const Collection &values, std::size_t depth)
+            {
+                constexpr bool is_object = std::is_same_v<Collection, JsonValue::Object>;
+                if (depth == max_depth)
+                {
+                    return std::unexpected(JsonError{"nesting limit exceeded", std::nullopt});
+                }
+                m_output += is_object ? '{' : '[';
+                bool first = true;
+                for (const auto &item : values)
+                {
+                    if (!first)
+                    {
+                        m_output += ',';
+                    }
+                    first = false;
+                    indent(depth + 1);
+                    if constexpr (is_object)
+                    {
+                        if (auto result = write_string(item.first); !result)
+                        {
+                            return result;
+                        }
+                        m_output += m_pretty ? ": " : ":";
+                        if (auto result = write_value(item.second, depth + 1); !result)
+                        {
+                            return result;
+                        }
+                    }
+                    else if (auto result = write_value(item, depth + 1); !result)
+                    {
+                        return result;
+                    }
+                }
+                if (!first)
+                {
+                    indent(depth);
+                }
+                m_output += is_object ? '}' : ']';
+                return {};
+            }
+
+            void indent(std::size_t depth)
+            {
+                if (m_pretty)
+                {
+                    m_output += '\n';
+                    m_output.append(depth * 2, ' ');
+                }
+            }
+
+            std::expected<void, JsonError> write_string(std::string_view text)
+            {
+                m_output += '"';
+                for (std::size_t pos = 0; pos < text.size();)
+                {
+                    const auto byte = static_cast<unsigned char>(text[pos]);
+                    if (byte >= 0x80)
+                    {
+                        const auto length = utf8_length(text.substr(pos));
+                        if (length == 0)
+                        {
+                            return std::unexpected(JsonError{"invalid UTF-8", std::nullopt});
+                        }
+                        m_output.append(text.substr(pos, length));
+                        pos += length;
+                        continue;
+                    }
+                    ++pos;
+                    if (byte == '"' || byte == '\\')
+                    {
+                        m_output += '\\';
+                        m_output += static_cast<char>(byte);
+                    }
+                    else if (byte < 0x20)
+                    {
+                        m_output += "\\u00";
+                        m_output += hex_digits[byte >> 4];
+                        m_output += hex_digits[byte & 0x0f];
+                    }
+                    else
+                    {
+                        m_output += static_cast<char>(byte);
+                    }
+                }
+                m_output += '"';
+                return {};
+            }
+        };
     }
-}
 
-Value JsonParser::parse_object(JsonLexer&)
-{
-    // if (lexer.peek() == '}') // quick escape
-    // {
-    //     lexer.next(); // consume closing brace
-    //     return Value::object();
-    // }
-    //
-    // auto obj = Value::Object{ };
-    // while (true)
-    // {
-    //     Token key_token = lexer.next();
-    //     if (key_token.m_type != TokenType::String) return {}; // Expected string key
-    //
-    //     if (lexer.next().m_type != TokenType::Colon) return {};
-    //
-    //     // Optimization: Check for Arithmetic Wrapper Signature
-    //     // This is "efficient and maintainable" because it isolates the complex logic
-    //     // into a specific check rather than complicating the generic loop.
-    //     if (first && key_token.payload == "type")
-    //     {
-    //         // Peek next token (the value of "type")
-    //         // We have to consume it to check it, but that's fine as we are committing to a path
-    //         Token type_value_token = lexer.next();
-    //
-    //         if (type_value_token.m_type == TokenType::String)
-    //         {
-    //             // Check if the type name is one of our known arithmetic types
-    //             int type_index = -1;
-    //             for (size_t i = 1; i < value_type_names.size(); ++i)
-    //             {
-    //                 if (value_type_names[i] == type_value_token.payload)
-    //                 {
-    //                     type_index = static_cast<int>(i);
-    //                     break;
-    //                 }
-    //             }
-    //
-    //             if (type_index != -1)
-    //             {
-    //                 // It IS an arithmetic wrapper
-    //                 return parse_arithmetic_wrapper(lexer, type_index);
-    //             }
-    //
-    //             // Not a wrapper, just a key named "type". Add to object.
-    //             obj.emplace("type", unescape_string(type_value_token.payload));
-    //         }
-    //         else
-    //         {
-    //             // Value of "type" wasn't a string, so definitely not our wrapper
-    //             // We need to parse whatever that value is recursively
-    //             // But we already consumed the token. We need to handle this edge case.
-    //             // Ideally we would 'putback' or recursively parse from token.
-    //             // For simplicity in this specific "type" string check,
-    //             // we can't easily recurse if we already consumed the token.
-    //             // However, in valid JSON "type" value usually is a string.
-    //             // If it's not, we just treat it as object.
-    //             // (Implementation simplified: assuming "type" value is string for now,
-    //             //  or you can refactor to peek token type before consuming)
-    //              return {}; // Error for this specific restricted implementation
-    //         }
-    //     }
-    //     else
-    //     {
-    //         obj.emplace(unescape_string(key_token.payload), parse_recursive(lexer));
-    //     }
-    //
-    //     Token next = lexer.next();
-    //     if (next.m_type == TokenType::RBrace) break;
-    //     if (next.m_type != TokenType::Comma) return {};
-    // }
-    // return obj;
+    std::expected<JsonValue, JsonError> parse_json(std::string_view input)
+    {
+        return Parser{input}.parse();
+    }
 
-    return {};
-}
+    std::expected<JsonValue, JsonError> read_json(std::istream &input)
+    {
+        try
+        {
+            if (input.good())
+            {
+                const std::string text{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+                if (!input.bad())
+                {
+                    return parse_json(text);
+                }
+            }
+        }
+        catch (const std::ios_base::failure &)
+        {
+            return std::unexpected(JsonError{"failed to read JSON stream", std::nullopt});
+        }
+        return std::unexpected(JsonError{"failed to read JSON stream", std::nullopt});
+    }
 
-Value JsonParser::parse_arithmetic_wrapper(JsonLexer&)
-{
-    // // We already consumed { "type": "int32"
-    // // Expect: , "value": <number> }
-    //
-    // if (lexer.next().m_type != TokenType::Comma) return {};
-    //
-    // Token key = lexer.next();
-    // if (key.m_type != TokenType::String || key.payload != "value") return {};
-    //
-    // if (lexer.next().m_type != TokenType::Colon) return {};
-    //
-    // Token value_token = lexer.next();
-    // if (value_token.m_type != TokenType::Number) return {};
-    //
-    // Value result;
-    // const auto* start = value_token.payload.data();
-    // const auto* end = start + value_token.payload.size();
-    //
-    // // High-performance conversion using std::from_chars
-    // switch (type_index)
-    // {
-    // case 1: { int32_t v; std::from_chars(start, end, v); result = v; break; }
-    // case 2: { uint32_t v; std::from_chars(start, end, v); result = v; break; }
-    // case 3: { int64_t v; std::from_chars(start, end, v); result = v; break; }
-    // case 4: { uint64_t v; std::from_chars(start, end, v); result = v; break; }
-    // case 5: { int16_t v; std::from_chars(start, end, v); result = static_cast<char>(v); break; }
-    // case 6: { uint16_t v; std::from_chars(start, end, v); result = static_cast<unsigned char>(v); break; }
-    // case 7: {
-    //         char* e;
-    //         result = std::strtof(start, &e); // from_chars for float is C++17/20 partial support
-    //         break;
-    // }
-    // case 8: {
-    //         char* e;
-    //         result = std::strtod(start, &e);
-    //         break;
-    // }
-    // }
-    //
-    // if (lexer.next().m_type != TokenType::RBrace) return {};
-    // return result;
+    std::expected<std::string, JsonError> write_json(const JsonValue &value, bool pretty)
+    {
+        return Writer{pretty}.write(value);
+    }
 
-    return {};
+    std::expected<void, JsonError> write_json(std::ostream &output, const JsonValue &value, bool pretty)
+    {
+        auto text = write_json(value, pretty);
+        if (!text)
+        {
+            return std::unexpected(text.error());
+        }
+        if (!std::in_range<std::streamsize>(text->size()))
+        {
+            return std::unexpected(JsonError{"JSON output exceeds stream size limit", std::nullopt});
+        }
+        try
+        {
+            output.write(text->data(), static_cast<std::streamsize>(text->size()));
+            if (output)
+            {
+                return {};
+            }
+        }
+        catch (const std::ios_base::failure &)
+        {
+            return std::unexpected(JsonError{"failed to write JSON stream", std::nullopt});
+        }
+        return std::unexpected(JsonError{"failed to write JSON stream", std::nullopt});
+    }
 }

@@ -1,54 +1,47 @@
 #pragma once
 
-#include <cstdint>
+#include <cstddef>
+#include <expected>
+#include <iosfwd>
+#include <map>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <variant>
+#include <vector>
 
-#include "core/value.hpp"
-
-enum class TokenType : uint8_t
+namespace io
 {
-    Eof, Error, Null, String, Number,
-    LBrace, RBrace, LBracket, RBracket, Colon, Comma
-};
+    struct JsonNumber
+    {
+        // The JSON token is retained exactly, including precision and exponent spelling.
+        std::string m_text;
 
-struct Token
-{
-    TokenType m_type;
-    std::string_view m_text;
-    size_t m_position;
-};
+        bool operator==(const JsonNumber &) const = default;
+    };
 
-class JsonLexer
-{
-private:
-    const char * m_ptr;
-    const char * const m_start;
-    const char * const m_end;
+    struct JsonValue
+    {
+        using Array = std::vector<JsonValue>;
+        using Object = std::map<std::string, JsonValue>;
+        using Data = std::variant<std::nullptr_t, bool, JsonNumber, std::string, Array, Object>;
 
-public:
-    explicit JsonLexer(std::string_view source);
+        Data m_data{nullptr};
 
-    Token next() noexcept;
-    char peek() noexcept;
+        bool operator==(const JsonValue &) const = default;
+    };
 
-private:
-    size_t remaining() const { return static_cast<size_t>(m_end - m_ptr); }
-    size_t position() const { return static_cast<size_t>(m_ptr - m_start); }
+    struct JsonError
+    {
+        std::string_view m_message;
+        std::optional<std::size_t> m_offset;
+    };
 
-    void skip_whitespace() noexcept;
+    // Parse one complete document. Comments are allowed between tokens.
+    [[nodiscard]] std::expected<JsonValue, JsonError> parse_json(std::string_view input);
+    [[nodiscard]] std::expected<JsonValue, JsonError> read_json(std::istream &input);
 
-    Token scan_string() noexcept;
-    Token scan_number() noexcept;
-};
-
-class JsonParser
-{
-public:
-    Value parse(std::string_view sv);
-
-private:
-    Value parse_recursive(JsonLexer & lexer);
-    Value parse_array(JsonLexer & lexer);
-    Value parse_object(JsonLexer & lexer);
-    Value parse_arithmetic_wrapper(JsonLexer & lexer);
-};
+    // Write standard JSON. Pretty output uses two spaces per level.
+    [[nodiscard]] std::expected<std::string, JsonError> write_json(const JsonValue &value, bool pretty = false);
+    [[nodiscard]] std::expected<void, JsonError> write_json(std::ostream &output, const JsonValue &value, bool pretty = false);
+}

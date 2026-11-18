@@ -6,7 +6,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "io/indentation.hpp"
+#include <iosfwd>
+#include <type_traits>
+#include <utility>
 
 class Value
 {
@@ -22,38 +24,42 @@ public:
         float, double,
         std::string,
         Array,
-        Object
-    >;
+        Object>;
 
 private:
     Data m_data;
 
 public:
-
     Value()
         : m_data(std::monostate{})
-    { }
+    {
+    }
 
-    Value(const Value & other) = default;
-    Value(Value && other) noexcept = default;
+    Value(const Value &other) = default;
+    Value(Value &&other) noexcept = default;
 
-    Value & operator=(const Value & other) = default;
-    Value & operator=(Value && other) noexcept = default;
+    Value &operator=(const Value &other) = default;
+    Value &operator=(Value &&other) noexcept = default;
 
-    static Value array() noexcept { return Value{ Array{} }; }
-    static Value object() noexcept { return Value{ Object{} }; }
+    static Value array() noexcept
+    {
+        return Value{Array{}};
+    }
+    static Value object() noexcept
+    {
+        return Value{Object{}};
+    }
 
     template <typename T>
-        requires (!std::is_same_v<std::decay_t<T>, Value>
-                && std::is_constructible_v<Data, T>)
-    explicit Value(T && value)
+        requires(!std::is_same_v<std::decay_t<T>, Value> && std::is_constructible_v<Data, T>)
+    explicit Value(T &&value)
         : m_data(std::forward<T>(value))
-    { }
+    {
+    }
 
     template <typename T>
-        requires (!std::is_same_v<std::decay_t<T>, Value>
-                && std::is_constructible_v<Data, T>)
-    Value & operator=(T && value)
+        requires(!std::is_same_v<std::decay_t<T>, Value> && std::is_constructible_v<Data, T>)
+    Value &operator=(T &&value)
     {
         m_data = std::forward<T>(value);
         return *this;
@@ -71,26 +77,17 @@ public:
     }
 
     template <typename T>
-    T& as()
+    T &as()
     {
         return std::get<T>(m_data);
     }
 
     template <typename T>
-    const T& as() const
+    const T &as() const
     {
         return std::get<T>(m_data);
     }
 
-    std::string to_string() const;
-
-    void write_json(std::ostream & os) const noexcept;
-    void write_pretty_json(std::ostream & os, const std::string & indent = "  ") const noexcept;
-    static Value read_json(std::istream & is) noexcept;
-
-    void write_binary(std::ostream & os) const noexcept;
-    static Value read_binary(std::istream & is) noexcept;
-
-private:
-    void write_pretty_json_impl(std::ostream & os, Indentation & indentation) const noexcept;
+    void write_binary(std::ostream &os) const noexcept;
+    static Value read_binary(std::istream &is) noexcept;
 };
