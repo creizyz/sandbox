@@ -38,3 +38,19 @@ Number documents within each section using two-digit prefixes, starting at `01`.
 | Write or review C++ and check API maturity | [C++ conventions and API maturity](development/01-cpp-conventions.md) |
 | Configure, build, format changed files, export compile commands, run tests, or run benchmarks | [Build and validation](development/02-build-and-validation.md) |
 | Record or review an architectural decision | [Architecture decision records](adr/README.md) |
+| Select an agent procedure for a recurring task | [Repository skills](#repository-skills) |
+
+## Repository skills
+
+Select a skill by the result the task calls for. The guidelines and project documentation
+continue to define the applicable standards and contracts.
+
+| Skill | Requested outcome |
+| --- | --- |
+| [`review-change`](../.agents/skills/review-change/SKILL.md) | Findings about a proposed or existing code change |
+| [`investigate-defect`](../.agents/skills/investigate-defect/SKILL.md) | The cause of an observed failure or a check that distinguishes plausible causes |
+| [`research-question`](../.agents/skills/research-question/SKILL.md) | A bounded technical answer supported by external evidence |
+| [`design-change`](../.agents/skills/design-change/SKILL.md) | A design recommendation with alternatives and consequences |
+| [`implement-change`](../.agents/skills/implement-change/SKILL.md) | A working and verified C++ feature, fix, or refactor |
+| [`benchmark-change`](../.agents/skills/benchmark-change/SKILL.md) | A controlled performance measurement or comparison |
+| [`maintain-documentation`](../.agents/skills/maintain-documentation/SKILL.md) | A durable update to repository documentation or its indexes |
