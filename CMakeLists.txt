@@ -44,3 +44,5 @@ endif()
 if(BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
+
+include(cmake/FormatChanged.cmake)

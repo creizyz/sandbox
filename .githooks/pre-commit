@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+for python in python3 python; do
+    if "$python" -c 'import sys; raise SystemExit(sys.version_info.major != 3)' 2>/dev/null; then
+        exec "$python" tools/format_changed.py check-staged
+    fi
+done
+
+if command -v wsl.exe >/dev/null 2>&1; then
+    # Preserve Git's alternate index, including the temporary index used by partial commits.
+    if [ -n "${GIT_INDEX_FILE:-}" ]; then
+        WSLENV="${WSLENV:+$WSLENV:}GIT_INDEX_FILE/p"
+    fi
+    if [ -n "${GIT_DIR:-}" ]; then
+        WSLENV="${WSLENV:+$WSLENV:}GIT_DIR/p"
+    fi
+    if [ -n "${GIT_WORK_TREE:-}" ]; then
+        WSLENV="${WSLENV:+$WSLENV:}GIT_WORK_TREE/p"
+    fi
+    export WSLENV
+    exec wsl.exe --exec python3 tools/format_changed.py check-staged
+fi
+
+echo "The pre-commit formatting check requires Python 3." >&2
+exit 1
