@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(Sandbox VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
@@ -15,6 +15,7 @@ file(GLOB_RECURSE LIB_SOURCES
 
 # ---- Library Target ----
 add_library(sandbox ${LIB_SOURCES})
+target_compile_features(sandbox PUBLIC cxx_std_23)
 target_include_directories(sandbox PUBLIC library)
 
 # ---- Modules ----
