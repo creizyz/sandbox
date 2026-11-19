@@ -8,11 +8,14 @@ description: Complete an authorized Sandbox C++ feature, fix, or refactor throug
 1. Identify the affected entry point and caller-visible contract. Consult the
    [C++ conventions](../../../docs/development/01-cpp-conventions.md) for style and API maturity.
    Check sample callers, older inputs, and stable contract obligations as applicable.
+   Before editing, follow [Benchmark changed files](../../../docs/development/02-build-and-validation.md#benchmark-changed-files)
+   to select affected cases and capture the baseline.
 2. Make the smallest coherent change through the normal entry point. Follow the
    [programming guideline](../../../guidelines/05-programming.md) and keep behavior consistent
    across applicable types, sizes, and failure paths.
 3. Use [build and validation](../../../docs/development/02-build-and-validation.md) to select
    checks that exercise the change. Instantiate altered template operations from caller code when
    the regular build misses them. Disable build auto-formatting when it would touch unrelated edits.
+   Rerun the associated benchmarks after the changes.
 4. Review the final diff and report the behavior change, compatibility effects, and validation
-   actually performed.
+   actually performed, including the measured changes specified by the benchmark workflow.

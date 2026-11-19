@@ -30,6 +30,8 @@ NaN components and treats matching infinities as equal.
 `rotate()` expects a unit quaternion. Reflection expects a unit normal, and refraction expects
 unit incident and normal vectors.
 
+See [rigid motion](02-rigid-motion.md) for Cartesian rotations, poses, and angular dynamics.
+
 ## Polar coordinates
 
 [`Polar2<T>`](../polar.hpp) stores a nonnegative radius and an angle in `[-π, π)`.

@@ -37,11 +37,14 @@ Number documents within each section using two-digit prefixes, starting at `01`.
 | --- | --- |
 | Write or review C++ and check API maturity | [C++ conventions and API maturity](development/01-cpp-conventions.md) |
 | Use vector storage, handles, matrix arithmetic, polar coordinates, or interpolation | [Math contracts](../library/math/docs/01-math-contracts.md) |
+| Rotate Cartesian vectors, compose rigid poses, or advance an orientation | [Rigid motion](../library/math/docs/02-rigid-motion.md) |
+| Measure rotation, pose, or angular dynamics operations | [Rigid motion benchmarks](../benchmarks/math/docs/01-rigid-motion-performance.md) |
 | Read or write JSON, including comment and number handling | [JSON I/O](../library/io/docs/01-json.md) |
 | Read or write portable YAML configuration documents | [YAML I/O](../library/io/docs/02-yaml.md) |
 | Convert JSON or YAML values to and from core values | [Document values and core conversion](../library/io/docs/03-document-value.md) |
 | Measure JSON, YAML, or core value conversion performance | [Document I/O benchmarks](../benchmarks/io/docs/01-document-performance.md) |
 | Configure, build, format changed files, export compile commands, run tests, or run benchmarks | [Build and validation](development/02-build-and-validation.md) |
+| Identify benchmarks affected by file edits, rerun them, and report deltas | [Benchmark changed files](development/02-build-and-validation.md#benchmark-changed-files) |
 | Record or review an architectural decision | [Architecture decision records](adr/README.md) |
 | Select an agent procedure for a recurring task | [Repository skills](#repository-skills) |
 

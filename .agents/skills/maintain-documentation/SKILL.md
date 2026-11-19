@@ -8,9 +8,12 @@ description: Author, update, move, or reindex Sandbox repository documentation w
 1. Find the document that owns the information using the [project index](../../../docs/README.md)
    and [documentation guideline](../../../guidelines/11-documentation-and-knowledge.md).
    Check implementation and accepted decisions for any claims that are changing.
+   Before editing, check for associated cases and capture a baseline where applicable.
+   [Benchmark changed files](../../../docs/development/02-build-and-validation.md#benchmark-changed-files)
 2. Put project-specific commands and contracts with their owning scope. Keep reusable standards
    in the guidelines and navigation in indexes. Preserve the status of proposals, experimental
    APIs, and historical material.
 3. When moving or renumbering material, find incoming references, update paths and anchors, and
    confirm the surviving index leads to the new location. Verify new or changed links and
-   distinguish verified behavior from instructions that were inspected only.
+   distinguish verified behavior from instructions that were inspected only. Rerun associated
+   benchmarks and report the measured changes in the work summary.

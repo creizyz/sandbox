@@ -13,6 +13,8 @@ description: Review a proposed or existing code change for regressions, contract
 3. For each candidate finding, identify a triggering condition, affected caller, observable
    consequence, and evidence connecting them to the change. Attribute baseline defects separately.
    If running an authorized build, follow [build and validation](../../../docs/development/02-build-and-validation.md)
-   with automatic source formatting disabled for the review.
+   with automatic source formatting disabled for the review. Check the work summary for the
+   **Stable** statistics and per-case **Slower** and **Faster** results. See
+   [Benchmark changed files](../../../docs/development/02-build-and-validation.md#benchmark-changed-files).
 4. Report actionable findings in priority order with file locations. If there are none, state
    what you reviewed and any meaningful verification gap.

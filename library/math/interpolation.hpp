@@ -11,6 +11,7 @@
 #include "polar.hpp"
 #include "vectors.hpp"
 #include "quaternion.hpp"
+#include "detail/angle.hpp"
 
 namespace math
 {
@@ -210,7 +211,7 @@ namespace math
         }
 
         constexpr T pi = std::numbers::pi_v<T>;
-        T sweep = detail::wrap_polar_angle(b.angle() - a.angle());
+        T sweep = detail::wrap_radians(b.angle() - a.angle());
         if (sweep == -pi)
         {
             sweep = pi;

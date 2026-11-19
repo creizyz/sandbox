@@ -5,25 +5,11 @@
 #include <concepts>
 #include <numbers>
 
+#include "detail/angle.hpp"
 #include "vectors.hpp"
 
 namespace math
 {
-    namespace detail
-    {
-        template <std::floating_point T>
-        T wrap_polar_angle(T angle)
-        {
-            constexpr T pi = std::numbers::pi_v<T>;
-            const T wrapped = std::remainder(angle, T{2} * pi);
-            if (wrapped == pi)
-            {
-                return -pi;
-            }
-            return wrapped == T{0} ? T{0} : wrapped;
-        }
-    }
-
     template <std::floating_point T>
     class Polar2
     {
@@ -37,10 +23,10 @@ namespace math
             assert(std::isfinite(radius) && std::isfinite(angle));
             if (m_radius != T{0})
             {
-                m_angle = detail::wrap_polar_angle(angle);
+                m_angle = detail::wrap_radians(angle);
                 if (radius < T{0})
                 {
-                    m_angle = detail::wrap_polar_angle(m_angle + std::numbers::pi_v<T>);
+                    m_angle = detail::wrap_radians(m_angle + std::numbers::pi_v<T>);
                 }
             }
         }
@@ -73,7 +59,7 @@ namespace math
         [[nodiscard]] Polar2 rotated(T angle) const
         {
             assert(std::isfinite(angle));
-            return Polar2{m_radius, m_angle + detail::wrap_polar_angle(angle)};
+            return Polar2{m_radius, m_angle + detail::wrap_radians(angle)};
         }
 
     private:

@@ -1,9 +1,14 @@
 ---
 name: benchmark-change
-description: Measure a Sandbox performance question or compare an implementation with a baseline under controlled conditions. Use when timing, scaling, allocation, or other quantitative evidence is the requested outcome.
+description: Measure a Sandbox performance question or compare an implementation with a baseline under controlled conditions. Use for requested performance measurements and for reporting the benchmark impact of file changes.
 ---
 
 # Benchmark a change
+
+For validation of file edits, follow [Benchmark changed files](../../../docs/development/02-build-and-validation.md#benchmark-changed-files)
+to select cases and capture the pre-change baseline. In the work summary, give the **Stable**
+statistics, including separate means for cases that measured slower and faster, and list each
+**Slower** and **Faster** case with its results.
 
 1. Define the operation, metric, representative inputs, and comparison. Identify setup included
    in the measurement. Use the [project build guide](../../../docs/development/02-build-and-validation.md)

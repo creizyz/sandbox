@@ -12,6 +12,9 @@ engineering efficiency, interface simplicity, then brevity.
   Complete the authorized scope, including relevant validation and documentation, without
   repeatedly asking for permission already given. Ask before expanding scope or crossing an
   approval boundary.
+- Before editing files, use the [benchmark workflow](docs/development/02-build-and-validation.md#benchmark-changed-files)
+  to identify affected benchmarks and capture a baseline. Rerun the cases and report the
+  measured changes in the work summary.
 - Evaluate requirements and assumptions independently. Prefer sound analysis, precise knowledge
   and evidence over agreement or speed. Challenge a weak premise with its consequence and a
   concrete alternative or investigation.
