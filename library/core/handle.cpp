@@ -4,7 +4,7 @@
 
 namespace
 {
-    inline void ensure_size(std::vector<std::uint32_t> & container, std::size_t n, std::uint32_t fill)
+    inline void ensure_size(std::vector<std::uint32_t> &container, std::size_t n, std::uint32_t fill)
     {
         if (container.size() < n)
         {
@@ -45,9 +45,8 @@ void HandleRegister::resize(std::size_t handle_capacity, std::size_t index_capac
 
     if (handle_capacity < m_free_ids.size())
     {
-        std::erase_if(m_free_ids, [=](std::uint32_t id) {
-            return id >= handle_capacity;
-        });
+        std::erase_if(m_free_ids, [=](std::uint32_t id)
+                      { return id >= handle_capacity; });
     }
 
     m_id_to_index.resize(handle_capacity, invalid_index);
@@ -63,7 +62,7 @@ Handle HandleRegister::insert(uint32_t index)
     // refuse to create new handles for already existing indices
     if (m_index_to_id[index] != invalid_id)
     {
-        return { };
+        return {};
     }
 
     // if at least one valid id is available
@@ -88,7 +87,7 @@ Handle HandleRegister::insert(uint32_t index)
     m_index_to_id[index] = id;
     m_id_to_index[id] = index;
 
-    return Handle{ id, m_generations[id] };
+    return Handle{id, m_generations[id]};
 }
 
 bool HandleRegister::update(Handle handle, uint32_t index)
@@ -146,18 +145,13 @@ void HandleRegister::erase(Handle handle)
 bool HandleRegister::is_valid(Handle handle) const noexcept
 {
     const auto id = handle.m_id;
-    if (id == invalid_id
-     || id >= m_id_to_index.size()
-     || id >= m_generations.size()
-     || m_generations[id] != handle.m_generation)
+    if (id == invalid_id || id >= m_id_to_index.size() || id >= m_generations.size() || m_generations[id] != handle.m_generation)
     {
         return false;
     }
 
     const auto index = m_id_to_index[id];
-    if (index == invalid_index
-     || index >= m_index_to_id.size()
-     || m_index_to_id[index] != id)
+    if (index == invalid_index || index >= m_index_to_id.size() || m_index_to_id[index] != id)
     {
         return false;
     }
@@ -173,4 +167,19 @@ uint32_t HandleRegister::get_index(Handle handle) const noexcept
     }
 
     return m_id_to_index[handle.m_id];
+}
+
+Handle HandleRegister::get_handle(uint32_t index) const noexcept
+{
+    if (index == invalid_index || index >= m_index_to_id.size())
+    {
+        return {};
+    }
+    const auto id = m_index_to_id[index];
+    if (id >= m_generations.size())
+    {
+        return {};
+    }
+    const Handle handle{id, m_generations[id]};
+    return get_index(handle) == index ? handle : Handle{};
 }

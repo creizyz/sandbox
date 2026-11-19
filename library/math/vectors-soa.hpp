@@ -1,114 +1,75 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 #include "core/handle.hpp"
 #include "vectors-view.hpp"
 
 namespace math
 {
-    template <size_t N, typename T>
+    template <std::size_t N, typename T>
+        requires(N > 0 && std::is_arithmetic_v<T> && std::is_same_v<T, std::remove_cv_t<T>>)
     class VectorSoa
     {
-    public:
-        // template <bool IsConst>
-        // struct IteratorImpl
-        // {
-        //     using iterator_category = std::random_access_iterator_tag;
-        //     using value_type        = VectorView<N, T>;
-        //     using difference_type   = std::ptrdiff_t;
-        //     using pointer           = void;
-        //     using reference         = std::conditional_t<IsConst, ConstVectorView<N, T>, VectorView<N, T>>;
-        //     using ContainerPtr      = std::conditional_t<IsConst, const VectorSoa*, VectorSoa*>;
-        //
-        //     size_t index;
-        //     ContainerPtr container;
-        //
-        //     reference operator*() const { return container->operator[](index); }
-        //
-        //     IteratorImpl& operator++() { ++index; return *this; }
-        //     IteratorImpl operator++(int) { IteratorImpl tmp = *this; ++index; return tmp; }
-        //     IteratorImpl& operator--() { --index; return *this; }
-        //
-        //     bool operator==(const IteratorImpl& other) const { return index == other.index; }
-        //     bool operator!=(const IteratorImpl& other) const { return index != other.index; }
-        //
-        //     IteratorImpl operator+(difference_type n) const { return {container, index + n}; }
-        //     difference_type operator-(const IteratorImpl& other) const { return index - other.index; }
-        // };
-        //
-        // using iterator = IteratorImpl<false>;
-        // using const_iterator = IteratorImpl<true>;
-        //
-        // iterator begin() { return {0, this}; }
-        // iterator end() { return {m_size, this}; }
-        //
-        // const_iterator begin() const { return {0, this}; }
-        // const_iterator end() const { return {m_size, this}; }
-        // const_iterator cbegin() const { return {0, this}; }
-        // const_iterator cend() const { return {m_size, this}; }
+        std::array<std::unique_ptr<T[]>, N> m_data;
+        std::size_t m_capacity{0};
+        std::size_t m_size{0};
+        HandleRegister m_handles;
 
-    private:
-        std::array<T*, N> m_data{ nullptr };
-        size_t            m_capacity{ 0 };
-        size_t            m_size{ 0 };
-        HandleRegister    m_handles;
+        static constexpr std::size_t max_capacity = HandleRegister::invalid_index;
 
     public:
         VectorSoa() = default;
 
-        explicit VectorSoa(size_t capacity)
-            : m_capacity(capacity)
+        explicit VectorSoa(std::size_t capacity)
         {
-            for (size_t i = 0; i < N; ++i)
-            {
-                m_data[i] = new T[m_capacity];
-            }
-            m_handles.reserve(capacity, capacity);
-        }
-
-        ~VectorSoa()
-        {
-            for (size_t i = 0; i < N; ++i)
-            {
-                delete[] m_data[i];
-            }
+            reserve(capacity);
         }
 
         VectorSoa(const VectorSoa &) = delete;
-        VectorSoa& operator=(const VectorSoa &) = delete;
+        VectorSoa &operator=(const VectorSoa &) = delete;
 
-        VectorSoa(VectorSoa && other) noexcept
-            : m_data(std::move(other.m_data))
-            , m_capacity(other.m_capacity)
-            , m_size(other.m_size)
-            , m_handles(std::move(other.m_handles))
+        VectorSoa(VectorSoa &&other) noexcept
+            : m_data(std::move(other.m_data)), m_capacity(std::exchange(other.m_capacity, 0)), m_size(std::exchange(other.m_size, 0)), m_handles(std::exchange(other.m_handles, HandleRegister{}))
         {
-            other.m_data.fill(nullptr);
-            other.m_capacity = 0;
-            other.m_size = 0;
         }
 
-        void reserve(size_t capacity)
+        void reserve(std::size_t capacity)
         {
-            if (capacity <= m_capacity)
+            if (capacity > m_capacity)
             {
-                return;
+                if (capacity > max_capacity)
+                {
+                    throw std::length_error("VectorSoa capacity exceeds the handle index range");
+                }
+                m_handles.reserve(capacity, capacity);
+                reallocate(capacity);
             }
-
-            reallocate(capacity);
-            m_handles.reserve(capacity, capacity);
         }
 
-        void resize(size_t size)
+        void resize(std::size_t size)
         {
-            if (size > m_capacity)
+            reserve(size);
+            const std::array<T, N> zero{};
+            while (m_size < size)
             {
-                reallocate(size);
+                append(zero);
             }
-
-            m_handles.resize(size, size);
-            m_size = size;
+            while (m_size > size)
+            {
+                m_handles.erase(handle_at(m_size - 1));
+                --m_size;
+            }
         }
 
         void shrink_to_fit()
@@ -116,108 +77,213 @@ namespace math
             if (m_size < m_capacity)
             {
                 reallocate(m_size);
-                m_handles.resize(m_size, m_size);
             }
         }
 
         void clear() noexcept
         {
-            m_size = 0;
+            while (m_size > 0)
+            {
+                m_handles.erase(handle_at(m_size - 1));
+                --m_size;
+            }
         }
 
         [[nodiscard]] std::size_t size() const noexcept
         {
             return m_size;
         }
-
         [[nodiscard]] std::size_t capacity() const noexcept
         {
             return m_capacity;
         }
-
         [[nodiscard]] bool empty() const noexcept
         {
             return m_size == 0;
         }
 
-        VectorView<N, T> operator[](const size_t i)
+        [[nodiscard]] VectorView<N, T> operator[](std::size_t index) noexcept
         {
-            return get_view_internal(i, std::make_index_sequence<N>{});
+            assert(index < m_size);
+            return [this, index]<std::size_t... I>(std::index_sequence<I...>)
+            {
+                return VectorView<N, T>{&m_data[I][index]...};
+            }(std::make_index_sequence<N>{});
         }
 
-        ConstVectorView<N, T> operator[](const size_t i) const
+        [[nodiscard]] ConstVectorView<N, T> operator[](std::size_t index) const noexcept
         {
-            return get_view_internal(i, std::make_index_sequence<N>{});
+            assert(index < m_size);
+            return [this, index]<std::size_t... I>(std::index_sequence<I...>)
+            {
+                return ConstVectorView<N, T>{static_cast<const T *>(&m_data[I][index])...};
+            }(std::make_index_sequence<N>{});
         }
 
-        template <class... Args>
-            requires (sizeof...(Args) == N && (std::is_convertible_v<Args, T> && ...))
-        Handle emplace(Args&& ... xs)
+        [[nodiscard]] Handle handle_at(std::size_t index) const noexcept
         {
+            return index < m_size ? m_handles.get_handle(static_cast<std::uint32_t>(index)) : Handle{};
+        }
+
+        [[nodiscard]] std::optional<VectorView<N, T>> get(Handle handle) noexcept
+        {
+            const auto index = m_handles.get_index(handle);
+            if (index < m_size)
+            {
+                return (*this)[index];
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ConstVectorView<N, T>> get(Handle handle) const noexcept
+        {
+            const auto index = m_handles.get_index(handle);
+            if (index < m_size)
+            {
+                return (*this)[index];
+            }
+            return std::nullopt;
+        }
+
+        template <typename... Args>
+            requires(sizeof...(Args) == N && (std::is_convertible_v<Args, T> && ...))
+        Handle emplace(Args &&...args)
+        {
+            const std::array<T, N> values{static_cast<T>(std::forward<Args>(args))...};
             if (m_size == m_capacity)
             {
-                reserve(m_capacity > 0 ? m_capacity * 2 : 1);
+                if (m_size == max_capacity)
+                {
+                    throw std::length_error("VectorSoa has no remaining handle indices");
+                }
+                reserve(m_capacity == 0 ? 1 : m_capacity + std::min(m_capacity, max_capacity - m_capacity));
             }
-
-            const auto index = static_cast<uint32_t>(m_size);
-            const auto handle = m_handles.insert(index);
-
-            // TODO
-
-            ++m_size;
-            return handle;
+            return append(values);
         }
 
         bool erase(Handle handle) noexcept
         {
-            if (!m_handles.is_valid(h))
+            const auto index = m_handles.get_index(handle);
+            if (index >= m_size)
             {
                 return false;
             }
 
-            const uint32_t index_u32 = m_handles.get_index(h);
-            const size_t index = static_cast<size_t>(index_u32);
-            const size_t last  = m_size - 1;
-
+            const auto last = m_size - 1;
+            m_handles.erase(handle);
             if (index != last)
             {
-                // Move last element into the hole.
-                for (size_t c = 0; c < N; ++c)
+                const auto moved = handle_at(last);
+                for (auto &component : m_data)
                 {
-                    m_data[c][index] = m_data[c][last];
+                    component[index] = component[last];
                 }
-
-                // Retarget moved element's handle from `last` to `index`.
-                Handle moved = m_handles.get_handle(static_cast<uint32_t>(last));
-                m_handles.update(moved, index_u32);
+                [[maybe_unused]] const auto updated = m_handles.update(moved, index);
+                assert(updated);
             }
-
-            m_handles.erase(h);
             --m_size;
             return true;
         }
 
-    private:
-        void reallocate(size_t capacity)
+        template <bool IsConst>
+        class Iterator
         {
-            for (size_t i = 0; i < N; ++i)
+            using Container = std::conditional_t<IsConst, const VectorSoa, VectorSoa>;
+            Container *m_container{nullptr};
+            std::size_t m_index{0};
+
+            Iterator(Container &container, std::size_t index) noexcept
+                : m_container(&container), m_index(index)
             {
-                T* new_buffer = (capacity > 0) ? new T[capacity] : nullptr;
-                if (m_size > 0 && m_data[i])
-                {
-                    std::copy_n(m_data[i], std::min(m_size, capacity), new_buffer);
-                    delete[] m_data[i];
-                }
-                m_data[i] = new_buffer;
             }
-            m_capacity = capacity;
-            if (m_size > m_capacity) m_size = m_capacity;
+
+            friend class VectorSoa;
+
+        public:
+            using iterator_concept = std::forward_iterator_tag;
+            using difference_type = std::ptrdiff_t;
+            using value_type = std::conditional_t<IsConst, ConstVectorView<N, T>, VectorView<N, T>>;
+
+            Iterator() = default;
+
+            [[nodiscard]] value_type operator*() const noexcept
+            {
+                return (*m_container)[m_index];
+            }
+
+            Iterator &operator++() noexcept
+            {
+                ++m_index;
+                return *this;
+            }
+
+            Iterator operator++(int) noexcept
+            {
+                Iterator previous = *this;
+                ++*this;
+                return previous;
+            }
+
+            bool operator==(const Iterator &) const = default;
+        };
+
+        using iterator = Iterator<false>;
+        using const_iterator = Iterator<true>;
+
+        [[nodiscard]] iterator begin() noexcept
+        {
+            return {*this, 0};
+        }
+        [[nodiscard]] iterator end() noexcept
+        {
+            return {*this, m_size};
+        }
+        [[nodiscard]] const_iterator begin() const noexcept
+        {
+            return {*this, 0};
+        }
+        [[nodiscard]] const_iterator end() const noexcept
+        {
+            return {*this, m_size};
+        }
+        [[nodiscard]] const_iterator cbegin() const noexcept
+        {
+            return begin();
+        }
+        [[nodiscard]] const_iterator cend() const noexcept
+        {
+            return end();
         }
 
-        template <size_t... Is>
-        VectorView<N, T> get_view_internal(size_t i, std::index_sequence<Is...>)
+    private:
+        Handle append(const std::array<T, N> &values)
         {
-            return VectorView<N, T>(m_data[Is][i]...);
+            const auto handle = m_handles.insert(static_cast<std::uint32_t>(m_size));
+            assert(handle.is_valid());
+            for (std::size_t i = 0; i < N; ++i)
+            {
+                m_data[i][m_size] = values[i];
+            }
+            ++m_size;
+            return handle;
+        }
+
+        void reallocate(std::size_t capacity)
+        {
+            std::array<std::unique_ptr<T[]>, N> data;
+            if (capacity > 0)
+            {
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    data[i] = std::make_unique_for_overwrite<T[]>(capacity);
+                    if (m_size > 0)
+                    {
+                        std::copy_n(m_data[i].get(), m_size, data[i].get());
+                    }
+                }
+            }
+            m_data = std::move(data);
+            m_capacity = capacity;
         }
     };
 }

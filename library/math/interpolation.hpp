@@ -1,50 +1,181 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <concepts>
+#include <cstddef>
 
 #include "vectors.hpp"
 #include "quaternion.hpp"
 
 namespace math
 {
-    template <typename T, size_t N>
-    constexpr Vector<N, T> lerp(const Vector<N, T>& a, const Vector<N, T>& b, T t)
+    template <std::floating_point T>
+    constexpr T lerp(T a, T b, T t)
     {
-        return a + (b - a) * std::clamp(t, static_cast<T>(0), static_cast<T>(1));
+        return std::lerp(a, b, std::clamp(t, T{0}, T{1}));
     }
 
-    template <typename T>
-    constexpr Quaternion<T> slerp(const Quaternion<T>& a, const Quaternion<T>& b, T t)
+    template <typename T, std::size_t N>
+    constexpr Vector<N, T> lerp(const Vector<N, T> &a, const Vector<N, T> &b, T t)
     {
-        T dot = a.v.dot(b.v);
+        if constexpr (std::floating_point<T>)
+        {
+            t = std::clamp(t, T{0}, T{1});
+            return a.transform(b, [t](T left, T right)
+                               { return std::lerp(left, right, t); });
+        }
+        else
+        {
+            return t < T{1} ? a : b;
+        }
+    }
 
-        Quaternion<T> target = b;
-        if (dot < static_cast<T>(0)) {
+    namespace detail
+    {
+        template <typename V, typename T>
+        concept LinearInterpolation = std::floating_point<T> && requires(const V &a, const V &b, T t) {
+            { math::lerp(a, b, t) } -> std::same_as<V>;
+        };
+
+        template <std::floating_point T>
+        constexpr Vector4<T> quaternion_components(const Quaternion<T> &q)
+        {
+            return Vector4<T>{q.x(), q.y(), q.z(), q.w()};
+        }
+    }
+
+    template <std::floating_point T>
+    constexpr T smoothstep(T t)
+    {
+        t = std::clamp(t, T{0}, T{1});
+        return t * t * (T{3} - T{2} * t);
+    }
+
+    template <std::floating_point T>
+    constexpr T smootherstep(T t)
+    {
+        t = std::clamp(t, T{0}, T{1});
+        const auto ease = [](T x)
+        { return x * x * x * (x * (T{6} * x - T{15}) + T{10}); };
+        return t > T{0.5} ? T{1} - ease(T{1} - t) : ease(t);
+    }
+
+    // Tangents are derivatives with respect to the normalized segment parameter.
+    template <typename V, std::floating_point T>
+        requires detail::LinearInterpolation<V, T>
+    constexpr V cubic_hermite(const V &a, const V &b, const V &tangent_a, const V &tangent_b, T t)
+    {
+        t = std::clamp(t, T{0}, T{1});
+        const T t_squared = t * t;
+        const T t_cubed = t_squared * t;
+        const T weight_b = T{3} * t_squared - T{2} * t_cubed;
+        const T weight_a = T{1} - weight_b;
+        const T tangent_weight_a = t_cubed - T{2} * t_squared + t;
+        const T tangent_weight_b = t_cubed - t_squared;
+        return a * weight_a + tangent_a * tangent_weight_a + b * weight_b + tangent_b * tangent_weight_b;
+    }
+
+    template <typename V, std::floating_point T>
+        requires detail::LinearInterpolation<V, T>
+    constexpr V cubic_bezier(const V &a, const V &control_a, const V &control_b, const V &b, T t)
+    {
+        const V first = lerp(a, control_a, t);
+        const V middle = lerp(control_a, control_b, t);
+        const V last = lerp(control_b, b, t);
+        return lerp(lerp(first, middle, t), lerp(middle, last, t), t);
+    }
+
+    // Evaluates the segment from p1 to p2. Coincident outer neighbors give zero tangents.
+    template <std::size_t N, std::floating_point T>
+    constexpr Vector<N, T> centripetal_catmull_rom(
+        const Vector<N, T> &p0, const Vector<N, T> &p1, const Vector<N, T> &p2, const Vector<N, T> &p3, T t)
+    {
+        const auto segment = p2 - p1;
+        const T segment_interval = std::sqrt(segment.length());
+        if (segment_interval == T{0})
+        {
+            return p1;
+        }
+
+        const auto segment_velocity = segment / segment_interval;
+        const auto tangent = [&](const Vector<N, T> &edge)
+        {
+            const T interval = std::sqrt(edge.length());
+            if (interval == T{0})
+            {
+                return Vector<N, T>::zero;
+            }
+            const T sum = interval + segment_interval;
+            const auto outer_velocity = edge / interval;
+            const auto knot_velocity = outer_velocity * (segment_interval / sum) + segment_velocity * (interval / sum);
+            return knot_velocity * segment_interval;
+        };
+        return cubic_hermite(p1, p2, tangent(p1 - p0), tangent(p3 - p2), t);
+    }
+
+    template <typename V, std::floating_point T>
+        requires detail::LinearInterpolation<V, T>
+    constexpr V bilinear(const V &v00, const V &v10, const V &v01, const V &v11, T x, T y)
+    {
+        return lerp(lerp(v00, v10, x), lerp(v01, v11, x), y);
+    }
+
+    // Corners use index x + 2*y + 4*z, with integer coordinates 0 or 1.
+    template <typename V, std::floating_point T>
+        requires detail::LinearInterpolation<V, T>
+    constexpr V trilinear(const std::array<V, 8> &corners, T x, T y, T z)
+    {
+        const V first = bilinear(corners[0], corners[1], corners[2], corners[3], x, y);
+        const V second = bilinear(corners[4], corners[5], corners[6], corners[7], x, y);
+        return lerp(first, second, z);
+    }
+
+    // Inputs must be unit quaternions. The shortest path may negate b.
+    template <std::floating_point T>
+    constexpr Quaternion<T> nlerp(const Quaternion<T> &a, const Quaternion<T> &b, T t)
+    {
+        const auto start = detail::quaternion_components(a);
+        const auto target = detail::quaternion_components(b);
+        const auto nearest = start.dot(target) < T{0} ? -target : target;
+        return Quaternion<T>{lerp(start, nearest, t)}.normalized();
+    }
+
+    // Inputs must be unit quaternions. Following the shortest arc may negate b.
+    template <std::floating_point T>
+    constexpr Quaternion<T> slerp(const Quaternion<T> &a, const Quaternion<T> &b, T t)
+    {
+        const auto start = detail::quaternion_components(a);
+        auto target = detail::quaternion_components(b);
+        t = std::clamp(t, T{0}, T{1});
+        T dot = start.dot(target);
+
+        if (dot < T{0})
+        {
             dot = -dot;
-            target.v = -b.v;
+            target = -target;
         }
 
-        if (dot > static_cast<T>(0.9995)) {
-            return Quaternion<T>(lerp(a.v, target.v, t)).normalized();
+        if (dot > static_cast<T>(0.9995))
+        {
+            return Quaternion<T>(lerp(start, target, t)).normalized();
         }
 
-        T theta_0 = std::acos(dot);
-        T theta = theta_0 * t;
-        T sin_theta = std::sin(theta);
-        T sin_theta_0 = std::sin(theta_0);
-
-        T s0 = std::cos(theta) - dot * sin_theta / sin_theta_0;
-        T s1 = sin_theta / sin_theta_0;
-
-        return Quaternion<T>(a.v * s0 + target.v * s1).normalized();
+        const T angle = std::acos(dot);
+        const T denominator = std::sin(angle);
+        const T start_weight = std::sin((T{1} - t) * angle) / denominator;
+        const T target_weight = std::sin(t * angle) / denominator;
+        return Quaternion<T>(start * start_weight + target * target_weight).normalized();
     }
 
-    template <typename T, size_t N>
-    constexpr Vector<N, T> move_towards(const Vector<N, T>& current, const Vector<N, T>& target, T max_distance_delta)
+    template <std::floating_point T, std::size_t N>
+    constexpr Vector<N, T> move_towards(const Vector<N, T> &current, const Vector<N, T> &target, T max_distance_delta)
     {
         Vector<N, T> to_target = target - current;
         T dist = to_target.length();
-        if (dist <= max_distance_delta || dist < epsilon_v<T>) {
+        if (dist <= max_distance_delta || dist < epsilon_v<T>)
+        {
             return target;
         }
         return current + (to_target / dist) * max_distance_delta;

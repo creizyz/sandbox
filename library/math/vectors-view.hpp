@@ -2,18 +2,17 @@
 
 #include <array>
 #include "vectors.hpp"
-#include "matrix.hpp"
 
 namespace math
 {
     template <std::size_t N, typename T>
-        requires (N > 0 && std::is_arithmetic_v<T>)
+        requires(N > 0 && std::is_arithmetic_v<T>)
     class VectorView
     {
         std::array<T *, N> m_data;
 
         template <std::size_t M, typename U>
-            requires (M > 0 && std::is_arithmetic_v<U>)
+            requires(M > 0 && std::is_arithmetic_v<U>)
         friend class VectorView;
 
     public:
@@ -27,31 +26,31 @@ namespace math
 
         VectorView() = delete;
 
-        VectorView(const VectorView&) noexcept = default;
-        VectorView& operator=(const VectorView&) noexcept = default;
+        VectorView(const VectorView &) noexcept = default;
+        VectorView &operator=(const VectorView &) noexcept = default;
 
-        VectorView(VectorView&&) noexcept = default;
-        VectorView& operator=(VectorView&&) noexcept = default;
+        VectorView(VectorView &&) noexcept = default;
+        VectorView &operator=(VectorView &&) noexcept = default;
 
         ~VectorView() = default;
 
-        explicit constexpr VectorView(const std::array<T*, N>& ptrs) noexcept
+        explicit constexpr VectorView(const std::array<T *, N> &ptrs) noexcept
             : m_data(ptrs)
         {
             assert_non_null(m_data);
         }
 
         template <typename... Ptrs>
-            requires (sizeof...(Ptrs) == N && (std::same_as<Ptrs, T*> && ...))
+            requires(sizeof...(Ptrs) == N && (std::same_as<Ptrs, T *> && ...))
         explicit constexpr VectorView(Ptrs... ptrs) noexcept
             : m_data{ptrs...}
         {
             assert_non_null_pack(ptrs...);
         }
 
-        explicit constexpr VectorView(const VectorView<N, std::remove_const_t<T>> & other) noexcept
-            requires (std::is_const_v<T>)
-            : m_data{ }
+        explicit constexpr VectorView(const VectorView<N, std::remove_const_t<T>> &other) noexcept
+            requires(std::is_const_v<T>)
+            : m_data{}
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -62,14 +61,9 @@ namespace math
 
         // --- Helpers ---
 
-        [[nodiscard]] constexpr Vector<N, T> as_vector() const
+        [[nodiscard]] constexpr Vector<N, std::remove_cv_t<T>> as_vector() const
         {
-            Vector<N, T> out{};
-            for (std::size_t i = 0; i < N; ++i)
-            {
-                out[i] = *(m_data[i]);
-            }
-            return out;
+            return to_vector<std::remove_cv_t<T>>();
         }
 
         template <typename U>
@@ -85,8 +79,8 @@ namespace math
         }
 
         template <typename Op>
-            requires (!std::is_const_v<T> && std::invocable<Op&, T> && std::is_convertible_v<std::invoke_result_t<Op&, T>, T>)
-        constexpr SelfReference apply(Op && op)
+            requires(!std::is_const_v<T> && std::invocable<Op &, T> && std::is_convertible_v<std::invoke_result_t<Op &, T>, T>)
+        constexpr SelfReference apply(Op &&op)
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -96,8 +90,8 @@ namespace math
         }
 
         template <typename Op>
-            requires (!std::is_const_v<T> && std::invocable<Op&, T, T> && std::is_convertible_v<std::invoke_result_t<Op&, T, T>, T>)
-        constexpr SelfReference apply(const VectorView<N, T> & other, Op && op)
+            requires(!std::is_const_v<T> && std::invocable<Op &, T, T> && std::is_convertible_v<std::invoke_result_t<Op &, T, T>, T>)
+        constexpr SelfReference apply(const VectorView<N, T> &other, Op &&op)
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -107,7 +101,7 @@ namespace math
         }
 
         template <typename U>
-            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+            requires(!std::is_const_v<T> && std::is_convertible_v<U, T>)
         constexpr SelfReference fill(U value)
         {
             for (std::size_t i = 0; i < N; ++i)
@@ -118,22 +112,22 @@ namespace math
         }
 
         template <typename U>
-            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+            requires(!std::is_const_v<T> && std::is_convertible_v<U, T>)
         constexpr SelfReference clamp(U min_value, U max_value)
         {
             const auto min = static_cast<T>(min_value);
             const auto max = static_cast<T>(max_value);
             for (std::size_t i = 0; i < N; ++i)
             {
-                auto & val = *(m_data[i]);
+                auto &val = *(m_data[i]);
                 val = val < min ? min : (val > max ? max : val);
             }
             return *this;
         }
 
         template <typename Pred>
-            requires std::predicate<Pred&, T>
-        [[nodiscard]] constexpr bool all(Pred && pred) const
+            requires std::predicate<Pred &, T>
+        [[nodiscard]] constexpr bool all(Pred &&pred) const
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -146,8 +140,8 @@ namespace math
         }
 
         template <typename Pred>
-            requires std::predicate<Pred&, T, T>
-        [[nodiscard]] constexpr bool all(const Vector<N, T> & other, Pred && pred) const
+            requires std::predicate<Pred &, T, T>
+        [[nodiscard]] constexpr bool all(const Vector<N, std::remove_cv_t<T>> &other, Pred &&pred) const
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -160,8 +154,8 @@ namespace math
         }
 
         template <typename Pred>
-            requires std::predicate<Pred&, T>
-        [[nodiscard]] constexpr bool any(Pred && pred) const
+            requires std::predicate<Pred &, T>
+        [[nodiscard]] constexpr bool any(Pred &&pred) const
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -174,8 +168,8 @@ namespace math
         }
 
         template <typename Pred>
-            requires std::predicate<Pred&, T, T>
-        [[nodiscard]] constexpr bool any(const Vector<N, T> & other, Pred && pred) const
+            requires std::predicate<Pred &, T, T>
+        [[nodiscard]] constexpr bool any(const Vector<N, std::remove_cv_t<T>> &other, Pred &&pred) const
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -189,20 +183,52 @@ namespace math
 
         // --- Named access ---
 
-        [[nodiscard]] constexpr T& x() requires (N >= 1 && N <= 4) { return *(m_data[0]); }
-        [[nodiscard]] constexpr T& y() requires (N >= 2 && N <= 4) { return *(m_data[1]); }
-        [[nodiscard]] constexpr T& z() requires (N >= 3 && N <= 4) { return *(m_data[2]); }
-        [[nodiscard]] constexpr T& w() requires (N == 4)           { return *(m_data[3]); }
+        [[nodiscard]] constexpr T &x()
+            requires(N >= 1 && N <= 4)
+        {
+            return *(m_data[0]);
+        }
+        [[nodiscard]] constexpr T &y()
+            requires(N >= 2 && N <= 4)
+        {
+            return *(m_data[1]);
+        }
+        [[nodiscard]] constexpr T &z()
+            requires(N >= 3 && N <= 4)
+        {
+            return *(m_data[2]);
+        }
+        [[nodiscard]] constexpr T &w()
+            requires(N == 4)
+        {
+            return *(m_data[3]);
+        }
 
-        [[nodiscard]] constexpr const T& x() const requires (N >= 1 && N <= 4) { return *(m_data[0]); }
-        [[nodiscard]] constexpr const T& y() const requires (N >= 2 && N <= 4) { return *(m_data[1]); }
-        [[nodiscard]] constexpr const T& z() const requires (N >= 3 && N <= 4) { return *(m_data[2]); }
-        [[nodiscard]] constexpr const T& w() const requires (N == 4)           { return *(m_data[3]); }
+        [[nodiscard]] constexpr const T &x() const
+            requires(N >= 1 && N <= 4)
+        {
+            return *(m_data[0]);
+        }
+        [[nodiscard]] constexpr const T &y() const
+            requires(N >= 2 && N <= 4)
+        {
+            return *(m_data[1]);
+        }
+        [[nodiscard]] constexpr const T &z() const
+            requires(N >= 3 && N <= 4)
+        {
+            return *(m_data[2]);
+        }
+        [[nodiscard]] constexpr const T &w() const
+            requires(N == 4)
+        {
+            return *(m_data[3]);
+        }
 
         // --- Basic Arithmetic ---
 
-        constexpr SelfReference add(const VectorView<N, T> & other)
-            requires (!std::is_const_v<T>)
+        constexpr SelfReference add(const VectorView<N, T> &other)
+            requires(!std::is_const_v<T>)
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -211,8 +237,8 @@ namespace math
             return *this;
         }
 
-        constexpr SelfReference subtract(const VectorView<N, T> & other)
-            requires (!std::is_const_v<T>)
+        constexpr SelfReference subtract(const VectorView<N, T> &other)
+            requires(!std::is_const_v<T>)
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -222,7 +248,7 @@ namespace math
         }
 
         template <typename U>
-            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+            requires(!std::is_const_v<T> && std::is_convertible_v<U, T>)
         constexpr SelfReference multiply(U scalar)
         {
             const auto s = static_cast<T>(scalar);
@@ -234,7 +260,7 @@ namespace math
         }
 
         template <typename U>
-            requires (!std::is_const_v<T> && std::is_convertible_v<U, T>)
+            requires(!std::is_const_v<T> && std::is_convertible_v<U, T>)
         constexpr SelfReference divide(U scalar)
         {
             if constexpr (std::is_floating_point_v<T>)
@@ -257,7 +283,7 @@ namespace math
 
         // --- Vector Arithmetic ---
 
-        [[nodiscard]] constexpr T dot(const VectorView<N, T> & other) const
+        [[nodiscard]] constexpr T dot(const VectorView<N, T> &other) const
         {
             auto out = static_cast<T>(0);
             for (std::size_t i = 0; i < N; ++i)
@@ -270,7 +296,7 @@ namespace math
         // --- Unary ---
 
         constexpr SelfReference invert()
-            requires (!std::is_const_v<T>)
+            requires(!std::is_const_v<T>)
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -287,19 +313,21 @@ namespace math
         [[nodiscard]] constexpr T length() const
             requires std::floating_point<T>
         {
-            return std::sqrt(squared_length());
+            return detail::scaled_norm<std::remove_cv_t<T>>(N, [this](std::size_t i)
+                                                            { return *m_data[i]; })
+                .length();
         }
 
         constexpr SelfReference normalize()
-            requires (!std::is_const_v<T> && std::floating_point<T>)
+            requires(!std::is_const_v<T> && std::floating_point<T>)
         {
-            const auto len = length();
-            if (len > epsilon_v<T>)
+            const auto norm = detail::scaled_norm<T>(N, [this](std::size_t i)
+                                                     { return *m_data[i]; });
+            if (norm.can_normalize())
             {
-                const auto inv_len = static_cast<T>(1.0) / len;
                 for (std::size_t i = 0; i < N; ++i)
                 {
-                    *(m_data[i]) *= inv_len;
+                    *m_data[i] = norm.normalize(*m_data[i]);
                 }
             }
             return *this;
@@ -308,8 +336,8 @@ namespace math
         // --- Comparison ---
 
         template <typename U>
-            requires (std::is_convertible_v<U, T>)
-        [[nodiscard]] constexpr bool equals(const VectorView<N, U>& other) const noexcept
+            requires(std::is_convertible_v<U, T>)
+        [[nodiscard]] constexpr bool equals(const VectorView<N, U> &other) const noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -322,15 +350,19 @@ namespace math
         }
 
         template <typename U>
-            requires (std::is_convertible_v<U, T> && std::floating_point<std::remove_const_t<T>>)
-        [[nodiscard]] constexpr bool near_equals(const VectorView<N, U>& other, std::remove_const_t<T> eps = epsilon_v<std::remove_const_t<T>>) const noexcept
+            requires(std::is_convertible_v<U, T> && std::floating_point<std::remove_const_t<T>>)
+        [[nodiscard]] constexpr bool near_equals(const VectorView<N, U> &other, std::remove_const_t<T> eps = epsilon_v<std::remove_const_t<T>>) const noexcept
         {
             using BaseType = std::remove_const_t<T>;
+            if (!(eps >= BaseType{0}))
+            {
+                return false;
+            }
             for (std::size_t i = 0; i < N; ++i)
             {
                 const auto a = static_cast<BaseType>((*this)[i]);
                 const auto b = static_cast<BaseType>(static_cast<T>(other[i]));
-                if (std::abs(a - b) > eps)
+                if (a != b && (!std::isfinite(a) || !std::isfinite(b) || !(std::abs(a - b) <= eps)))
                 {
                     return false;
                 }
@@ -340,7 +372,7 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] bool operator==(const VectorView<N, U> & other) const
+        [[nodiscard]] bool operator==(const VectorView<N, U> &other) const
         {
             if constexpr (std::is_floating_point_v<T>)
             {
@@ -354,53 +386,52 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] bool operator!=(const VectorView<N, U> & other) const
+        [[nodiscard]] bool operator!=(const VectorView<N, U> &other) const
         {
             return !(*this == other);
         }
 
         // --- Access ---
 
-        [[nodiscard]] constexpr const T & operator[](std::size_t index) const noexcept
+        [[nodiscard]] constexpr const T &operator[](std::size_t index) const noexcept
         {
             return *(m_data[index]);
         }
 
-        [[nodiscard]] constexpr T & operator[](std::size_t index) noexcept
+        [[nodiscard]] constexpr T &operator[](std::size_t index) noexcept
         {
             return *(m_data[index]);
         }
 
-        [[nodiscard]] constexpr const T & at(std::size_t index) const
+        [[nodiscard]] constexpr const T &at(std::size_t index) const
         {
             assert(index < N);
             return *(m_data[index]);
         }
 
-        [[nodiscard]] constexpr T & at(std::size_t index)
+        [[nodiscard]] constexpr T &at(std::size_t index)
         {
             assert(index < N);
             return *(m_data[index]);
         }
 
         template <size_t Index>
-            requires (Index < N)
-        [[nodiscard]] constexpr const T & get() const noexcept
+            requires(Index < N)
+        [[nodiscard]] constexpr const T &get() const noexcept
         {
             return *(m_data[Index]);
         }
 
         template <size_t Index>
-            requires (Index < N)
-        [[nodiscard]] constexpr T & get() noexcept
+            requires(Index < N)
+        [[nodiscard]] constexpr T &get() noexcept
         {
             return *(m_data[Index]);
         }
 
     private:
-
         // These arguments are used only when assertions are enabled.
-        static constexpr void assert_non_null([[maybe_unused]] const std::array<T*, N> & data) noexcept
+        static constexpr void assert_non_null([[maybe_unused]] const std::array<T *, N> &data) noexcept
         {
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -408,7 +439,7 @@ namespace math
             }
         }
 
-        static constexpr void assert_ptr_non_null([[maybe_unused]] const T* p) noexcept
+        static constexpr void assert_ptr_non_null([[maybe_unused]] const T *p) noexcept
         {
             assert(p != nullptr && "VectorView: null pointer is not allowed");
         }

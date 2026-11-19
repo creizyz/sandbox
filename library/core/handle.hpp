@@ -10,10 +10,10 @@ struct Handle
 {
     static constexpr auto invalid_id = std::numeric_limits<std::uint32_t>::max();
 
-    uint32_t m_id{ invalid_id };
-    uint32_t m_generation{ 0 };
+    uint32_t m_id{invalid_id};
+    uint32_t m_generation{0};
 
-    [[nodiscard]] constexpr  bool is_valid() const noexcept
+    [[nodiscard]] constexpr bool is_valid() const noexcept
     {
         return m_id != invalid_id;
     }
@@ -34,6 +34,7 @@ public:
 
     [[nodiscard]] bool is_valid(Handle handle) const noexcept;
     [[nodiscard]] uint32_t get_index(Handle handle) const noexcept;
+    [[nodiscard]] Handle get_handle(uint32_t index) const noexcept;
 
 private:
     std::vector<uint32_t> m_id_to_index;

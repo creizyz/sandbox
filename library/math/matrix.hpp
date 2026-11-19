@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cassert>
 #include <utility>
 #include <type_traits>
 
@@ -9,7 +11,7 @@
 namespace math
 {
     template <std::size_t Rows, std::size_t Cols, typename T>
-        requires (Rows > 0 && Cols > 0 && std::is_arithmetic_v<T>)
+        requires(Rows > 0 && Cols > 0 && std::is_arithmetic_v<T>)
     class Matrix
     {
         std::array<Vector<Rows, T>, Cols> m_cols;
@@ -21,10 +23,11 @@ namespace math
         constexpr Matrix() = default;
 
         template <typename... Args>
-            requires (sizeof...(Args) == Cols && (std::is_same_v<Args, Vector<Rows, T>> && ...))
+            requires(sizeof...(Args) == Cols && (std::is_same_v<Args, Vector<Rows, T>> && ...))
         explicit constexpr Matrix(Args... args)
-            : m_cols{ args... }
-        { }
+            : m_cols{args...}
+        {
+        }
 
         static constexpr Matrix<Rows, Cols, T> identity()
         {
@@ -39,19 +42,19 @@ namespace math
 
         // --- Accessors ---
 
-        [[nodiscard]] constexpr Vector<Rows, T>& operator[](std::size_t col) noexcept
+        [[nodiscard]] constexpr Vector<Rows, T> &operator[](std::size_t col) noexcept
         {
             return m_cols[col];
         }
 
-        [[nodiscard]] constexpr const Vector<Rows, T>& operator[](std::size_t col) const noexcept
+        [[nodiscard]] constexpr const Vector<Rows, T> &operator[](std::size_t col) const noexcept
         {
             return m_cols[col];
         }
 
         // --- Basic Arithmetic ---
 
-        [[nodiscard]] constexpr Vector<Rows, T> operator*(const Vector<Cols, T>& vec) const noexcept
+        [[nodiscard]] constexpr Vector<Rows, T> operator*(const Vector<Cols, T> &vec) const noexcept
         {
             if constexpr (Cols <= K_UNROLL_THRESHOLD)
             {
@@ -69,7 +72,7 @@ namespace math
         }
 
         template <std::size_t OtherCols>
-        [[nodiscard]] constexpr Matrix<Rows, OtherCols, T> operator*(const Matrix<Cols, OtherCols, T> & other) const noexcept
+        [[nodiscard]] constexpr Matrix<Rows, OtherCols, T> operator*(const Matrix<Cols, OtherCols, T> &other) const noexcept
         {
             Matrix<Rows, OtherCols, T> result;
             for (std::size_t i = 0; i < OtherCols; ++i)
@@ -79,7 +82,7 @@ namespace math
             return result;
         }
 
-        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator+(const Matrix<Rows, Cols, T> & other)
+        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator+(const Matrix<Rows, Cols, T> &other) const
         {
             if constexpr (Cols <= K_UNROLL_THRESHOLD)
             {
@@ -87,8 +90,8 @@ namespace math
             }
             else
             {
-                Matrix<Rows, Cols, T> result{ *this };
-                for (std::size_t i = 1; i < Cols; ++i)
+                Matrix<Rows, Cols, T> result{*this};
+                for (std::size_t i = 0; i < Cols; ++i)
                 {
                     result[i] += other[i];
                 }
@@ -96,7 +99,7 @@ namespace math
             }
         }
 
-        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator-(const Matrix<Rows, Cols, T> & other)
+        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator-(const Matrix<Rows, Cols, T> &other) const
         {
             if constexpr (Cols <= K_UNROLL_THRESHOLD)
             {
@@ -104,8 +107,8 @@ namespace math
             }
             else
             {
-                Matrix<Rows, Cols, T> result{ *this };
-                for (std::size_t i = 1; i < Cols; ++i)
+                Matrix<Rows, Cols, T> result{*this};
+                for (std::size_t i = 0; i < Cols; ++i)
                 {
                     result[i] -= other[i];
                 }
@@ -115,18 +118,19 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator*(U scalar)
+        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator*(U scalar) const
         {
+            const auto factor = static_cast<T>(scalar);
             if constexpr (Cols <= K_UNROLL_THRESHOLD)
             {
-                return multiply_scalar_impl(static_cast<T>(scalar), std::make_index_sequence<Cols>{});
+                return multiply_scalar_impl(factor, std::make_index_sequence<Cols>{});
             }
             else
             {
-                Matrix<Rows, Cols, T> result{ *this };
-                for (std::size_t i = 1; i < Cols; ++i)
+                Matrix<Rows, Cols, T> result{*this};
+                for (std::size_t i = 0; i < Cols; ++i)
                 {
-                    result[i] *= static_cast<T>(scalar);
+                    result[i] *= factor;
                 }
                 return result;
             }
@@ -134,15 +138,17 @@ namespace math
 
         template <typename U>
             requires std::is_convertible_v<U, T>
-        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator/(U scalar)
+        [[nodiscard]] constexpr Matrix<Rows, Cols, T> operator/(U scalar) const
         {
-            const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-            if (inv > epsilon_v<T>)
+            const auto divisor = static_cast<T>(scalar);
+            assert(divisor != T{0});
+            Matrix<Rows, Cols, T> result;
+            for (std::size_t i = 0; i < Cols; ++i)
             {
-                return (*this) * inv;
+                result[i] = m_cols[i].transform([divisor](T value)
+                                                { return value / divisor; });
             }
-
-            return *this;
+            return result;
         }
 
         // --- Matrix Operations ---
@@ -162,32 +168,33 @@ namespace math
 
     private:
         template <std::size_t... I>
-        constexpr Vector<Rows, T> multiply_vec_impl(const Vector<Cols, T>& vec, std::index_sequence<I...>) const noexcept
+        constexpr Vector<Rows, T> multiply_vec_impl(const Vector<Cols, T> &vec, std::index_sequence<I...>) const noexcept
         {
             return ((m_cols[I] * vec[I]) + ...);
         }
 
         template <std::size_t... I>
-        constexpr Matrix<Rows, Cols, T> add_matrix_impl(const Matrix<Rows, Cols, T> & other, std::index_sequence<I...>) const noexcept
+        constexpr Matrix<Rows, Cols, T> add_matrix_impl(const Matrix<Rows, Cols, T> &other, std::index_sequence<I...>) const noexcept
         {
-            return Matrix<Rows, Cols, T>{ (m_cols[I] + other.m_cols[I])... };
+            return Matrix<Rows, Cols, T>{(m_cols[I] + other.m_cols[I])...};
         }
 
         template <std::size_t... I>
-        constexpr Matrix<Rows, Cols, T> subtract_matrix_impl(const Matrix<Rows, Cols, T> & other, std::index_sequence<I...>) const noexcept
+        constexpr Matrix<Rows, Cols, T> subtract_matrix_impl(const Matrix<Rows, Cols, T> &other, std::index_sequence<I...>) const noexcept
         {
-            return Matrix<Rows, Cols, T>{ (m_cols[I] - other.m_cols[I])... };
+            return Matrix<Rows, Cols, T>{(m_cols[I] - other.m_cols[I])...};
         }
 
         template <std::size_t... I>
         constexpr Matrix<Rows, Cols, T> multiply_scalar_impl(T scalar, std::index_sequence<I...>) const noexcept
         {
-            return Matrix<Rows, Cols, T>{ (m_cols[I] * scalar)... };
+            return Matrix<Rows, Cols, T>{(m_cols[I] * scalar)...};
         }
     };
 
     // Common Aliases
-    template <typename T> using Matrix4x4 = Matrix<4, 4, T>;
+    template <typename T>
+    using Matrix4x4 = Matrix<4, 4, T>;
     using Matrix4f = Matrix4x4<float>;
     using Matrix4d = Matrix4x4<double>;
 }
