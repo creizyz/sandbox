@@ -36,7 +36,7 @@ Number documents within each section using two-digit prefixes, starting at `01`.
 | Task | Reference |
 | --- | --- |
 | Write or review C++ and check API maturity | [C++ conventions and API maturity](development/01-cpp-conventions.md) |
-| Use vector storage, handles, matrix arithmetic, or interpolation | [Math contracts](../library/math/docs/01-math-contracts.md) |
+| Use vector storage, handles, matrix arithmetic, polar coordinates, or interpolation | [Math contracts](../library/math/docs/01-math-contracts.md) |
 | Read or write JSON, including comment and number handling | [JSON I/O](../library/io/docs/01-json.md) |
 | Read or write portable YAML configuration documents | [YAML I/O](../library/io/docs/02-yaml.md) |
 | Convert JSON or YAML values to and from core values | [Document values and core conversion](../library/io/docs/03-document-value.md) |

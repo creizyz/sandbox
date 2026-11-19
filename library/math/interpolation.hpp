@@ -2,10 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <concepts>
 #include <cstddef>
+#include <numbers>
 
+#include "polar.hpp"
 #include "vectors.hpp"
 #include "quaternion.hpp"
 
@@ -179,5 +182,43 @@ namespace math
             return target;
         }
         return current + (to_target / dist) * max_distance_delta;
+    }
+
+    enum class PolarArc
+    {
+        Shortest,
+        Longest
+    };
+
+    template <std::floating_point T>
+    [[nodiscard]] Polar2<T> lerp(const Polar2<T> &a, const Polar2<T> &b, T t, PolarArc arc = PolarArc::Shortest)
+    {
+        assert(std::isfinite(t));
+        if (t <= T{0})
+        {
+            return a;
+        }
+        if (t >= T{1})
+        {
+            return b;
+        }
+
+        const T radius = math::lerp(a.radius(), b.radius(), t);
+        if (a.radius() == T{0} || b.radius() == T{0})
+        {
+            return Polar2<T>{radius, a.radius() == T{0} ? b.angle() : a.angle()};
+        }
+
+        constexpr T pi = std::numbers::pi_v<T>;
+        T sweep = detail::wrap_polar_angle(b.angle() - a.angle());
+        if (sweep == -pi)
+        {
+            sweep = pi;
+        }
+        if (arc == PolarArc::Longest && sweep != T{0})
+        {
+            sweep -= std::copysign(T{2} * pi, sweep);
+        }
+        return Polar2<T>{radius, a.angle() + t * sweep};
     }
 }
