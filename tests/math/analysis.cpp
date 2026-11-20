@@ -275,4 +275,19 @@ namespace math::tests
             EXPECT_NEAR((*result)[i], known[i], 1e-12);
         }
     }
+
+    TEST(LinearSolve, EliminatesRowsWhenTheMultiplierIsOutsideTheScalarRange)
+    {
+        for (const int exponent : {600, -600})
+        {
+            const double first_scale = std::ldexp(1.0, exponent);
+            const double second_scale = std::ldexp(1.0, -exponent);
+            const std::array matrix{first_scale, first_scale, second_scale, 2 * second_scale};
+            const std::array rhs{2 * first_scale, 3 * second_scale};
+            const auto solution = solve_linear_system<double>(matrix, rhs);
+            ASSERT_TRUE(solution);
+            EXPECT_EQ((*solution)[0], 1.0);
+            EXPECT_EQ((*solution)[1], 1.0);
+        }
+    }
 }

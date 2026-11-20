@@ -27,6 +27,70 @@ namespace io
             return {std::string(message), YamlLocation{mark.line + 1, mark.column + 1}};
         }
 
+        // LibYAML reader errors identify a byte offset, before the scanner has updated its mark.
+        YamlLocation reader_location(std::string_view input, std::size_t offset, yaml_encoding_t encoding)
+        {
+            auto prefix = input.substr(0, offset);
+            const bool utf16 = encoding == YAML_UTF16LE_ENCODING || encoding == YAML_UTF16BE_ENCODING;
+            if (utf16 && prefix.size() >= 2)
+            {
+                prefix.remove_prefix(2); // LibYAML detects UTF-16 by its BOM.
+            }
+            else if (prefix.starts_with("\xef\xbb\xbf"))
+            {
+                prefix.remove_prefix(3);
+            }
+
+            YamlLocation location{1, 1};
+            bool after_cr = false;
+            while (!prefix.empty())
+            {
+                unsigned code = static_cast<unsigned char>(prefix.front());
+                std::size_t width = 1;
+                if (utf16)
+                {
+                    if (prefix.size() < 2)
+                    {
+                        break;
+                    }
+                    const auto second = static_cast<unsigned char>(prefix[1]);
+                    code = encoding == YAML_UTF16LE_ENCODING ? code | (second << 8) : (code << 8) | second;
+                    width = code >= 0xd800 && code <= 0xdbff ? 4 : 2;
+                }
+                else if (code >= 0x80)
+                {
+                    width = detail::utf8_length(prefix);
+                    if (prefix.starts_with("\xc2\x85"))
+                    {
+                        code = 0x85;
+                    }
+                    else if (prefix.starts_with("\xe2\x80\xa8") || prefix.starts_with("\xe2\x80\xa9"))
+                    {
+                        code = 0x2028;
+                    }
+                }
+                if (width == 0 || width > prefix.size())
+                {
+                    break;
+                }
+                prefix.remove_prefix(width);
+                if (code == '\r' || code == '\n' || code == 0x85 || code == 0x2028 || code == 0x2029)
+                {
+                    if (!(after_cr && code == '\n'))
+                    {
+                        ++location.m_line;
+                    }
+                    location.m_column = 1;
+                }
+                else
+                {
+                    ++location.m_column;
+                }
+                after_cr = code == '\r';
+            }
+            return location;
+        }
+
         std::unexpected<YamlError> output_error(std::string_view message)
         {
             return std::unexpected(YamlError{std::string(message), std::nullopt});
@@ -181,6 +245,7 @@ namespace io
 
             Result<DocumentValue> read(std::string_view input)
             {
+                m_input = input;
                 if (!m_ready)
                 {
                     return output_error("could not initialize YAML parser");
@@ -214,6 +279,7 @@ namespace io
             }
 
         private:
+            std::string_view m_input;
             yaml_parser_t m_parser{};
             yaml_event_t m_event{};
             bool m_ready;
@@ -237,6 +303,10 @@ namespace io
 
             std::unexpected<YamlError> failure(std::string_view message) const
             {
+                if (m_parser.error == YAML_READER_ERROR)
+                {
+                    return std::unexpected(YamlError{m_parser.problem, reader_location(m_input, m_parser.problem_offset, m_parser.encoding)});
+                }
                 if (m_parser.error != YAML_NO_ERROR)
                 {
                     return std::unexpected(at(m_parser.problem ? m_parser.problem : "invalid YAML", m_parser.problem_mark));

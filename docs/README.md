@@ -36,6 +36,7 @@ Number documents within each section using two-digit prefixes, starting at `01`.
 | Task | Reference |
 | --- | --- |
 | Write or review C++ and check API maturity | [C++ conventions and API maturity](development/01-cpp-conventions.md) |
+| Run, pause, stop, or reconfigure a worker module | [Module lifecycle](../library/core/docs/01-module-lifecycle.md) |
 | Use vector storage, handles, matrix arithmetic, polar coordinates, or interpolation | [Math contracts](../library/math/docs/01-math-contracts.md) |
 | Rotate Cartesian vectors, compose rigid poses, or advance an orientation | [Rigid motion](../library/math/docs/02-rigid-motion.md) |
 | Measure rotation, pose, or angular dynamics operations | [Rigid motion benchmarks](../benchmarks/math/docs/01-rigid-motion-performance.md) |

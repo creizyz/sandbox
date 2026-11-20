@@ -1,155 +1,203 @@
 #include "value.hpp"
 
+#include <algorithm>
+#include <array>
 #include <istream>
+#include <limits>
 #include <ostream>
 
-void Value::write_binary(std::ostream &os) const noexcept
+namespace
 {
-    const auto index = static_cast<uint8_t>(m_data.index());
-    os.write(reinterpret_cast<const char *>(&index), sizeof(index));
+    template <typename T>
+    void write_primitive(std::ostream &output, const T &value)
+    {
+        output.write(reinterpret_cast<const char *>(&value), sizeof(value));
+    }
 
-    std::visit([&os](auto &&arg)
-               {
-        using T = std::decay_t<decltype(arg)>;
+    template <typename T>
+    T read_primitive(std::istream &input)
+    {
+        T value{};
+        input.read(reinterpret_cast<char *>(&value), sizeof(value));
+        return value;
+    }
 
-        if constexpr (std::is_same_v<T, std::monostate>)
+    // Old writers used native size_t for object keys. Grow only as bytes arrive.
+    std::string read_text(std::istream &input, std::size_t length)
+    {
+        std::string result;
+        std::array<char, 1024> buffer;
+        while (length > 0 && input)
         {
-            return; // nothing to write
+            const auto count = std::min(length, buffer.size());
+            if (!input.read(buffer.data(), static_cast<std::streamsize>(count)))
+            {
+                break;
+            }
+            result.append(buffer.data(), count);
+            length -= count;
         }
-        else if constexpr (std::is_same_v<T, bool>)
+        return result;
+    }
+
+    bool encodable(const Value &value)
+    {
+        constexpr auto limit = std::numeric_limits<Value::Size>::max();
+        if (value.is<std::string>())
         {
-            const uint8_t byte = arg ? 1 : 0;
-            os.write(reinterpret_cast<const char *>(&byte), sizeof(byte));
+            return value.as<std::string>().size() <= limit;
+        }
+        if (value.is<Value::Array>())
+        {
+            const auto &array = value.as<Value::Array>();
+            return array.size() <= limit && std::ranges::all_of(array, encodable);
+        }
+        if (value.is<Value::Object>())
+        {
+            const auto &object = value.as<Value::Object>();
+            return object.size() <= limit && std::ranges::all_of(object, [](const auto &entry)
+                                                                 { return std::in_range<std::streamsize>(entry.first.size()) && encodable(entry.second); });
+        }
+        return true;
+    }
+
+    template <typename T>
+    Value read_numeric(std::istream &input)
+    {
+        const auto value = read_primitive<T>(input);
+        return input ? Value{value} : Value{};
+    }
+}
+
+void Value::write_binary(std::ostream &output) const
+{
+    if (!encodable(*this))
+    {
+        output.setstate(std::ios::failbit);
+        return;
+    }
+    write_binary_unchecked(output);
+}
+
+void Value::write_binary_unchecked(std::ostream &output) const
+{
+    write_primitive(output, static_cast<std::uint8_t>(m_data.index()));
+    std::visit([&output](const auto &data)
+               {
+        using T = std::decay_t<decltype(data)>;
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            write_primitive(output, static_cast<std::uint8_t>(data));
         }
         else if constexpr (std::is_arithmetic_v<T>)
         {
-            os.write(reinterpret_cast<const char*>(&arg), sizeof(T));
+            write_primitive(output, data);
         }
         else if constexpr (std::is_same_v<T, std::string>)
         {
-            const auto size = static_cast<Value::Size>(arg.size());
-            os.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            os.write(arg.data(), size);
+            write_primitive(output, static_cast<Size>(data.size()));
+            output.write(data.data(), static_cast<std::streamsize>(data.size()));
         }
-        else if constexpr (std::is_same_v<T, Array>)
+        else if constexpr (std::is_same_v<T, Array> || std::is_same_v<T, Object>)
         {
-            const auto size = static_cast<Value::Size>(arg.size());
-            os.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            for (const auto & item : arg)
+            write_primitive(output, static_cast<Size>(data.size()));
+            for (const auto &item : data)
             {
-                item.write_binary(os);
-            }
-        }
-        else if constexpr (std::is_same_v<T, Object>)
-        {
-            const auto size = static_cast<Value::Size>(arg.size());
-            os.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            for (const auto & [key, value] : arg)
-            {
-                const auto key_size = key.size();
-                os.write(reinterpret_cast<const char*>(&key_size), sizeof(key_size));
-                os.write(key.data(), key_size);
-                value.write_binary(os);
+                if (!output)
+                {
+                    break;
+                }
+                if constexpr (std::is_same_v<T, Object>)
+                {
+                    write_primitive(output, item.first.size());
+                    output.write(item.first.data(), static_cast<std::streamsize>(item.first.size()));
+                    item.second.write_binary_unchecked(output);
+                }
+                else
+                {
+                    item.write_binary_unchecked(output);
+                }
             }
         } }, m_data);
 }
 
-template <typename T>
-    requires(std::is_arithmetic_v<T>)
-T read_primitive(std::istream &is)
+Value Value::read_binary(std::istream &input)
 {
-    T value{};
-    is.read(reinterpret_cast<char *>(&value), sizeof(T));
-    return value;
-}
-
-inline std::string read_string(std::istream &is)
-{
-    const auto size = read_primitive<Value::Size>(is);
-    std::string s(size, '\0');
-    is.read(&s[0], size);
-    return s;
-}
-
-Value Value::read_binary(std::istream &is) noexcept
-{
-    Value value;
-    uint8_t index = 0;
-
-    if (!is.read(reinterpret_cast<char *>(&index), sizeof(index)))
+    const auto tag = read_primitive<std::uint8_t>(input);
+    if (!input)
     {
-        return value;
+        return {};
     }
-
-    switch (index)
+    switch (tag)
     {
     case 0:
-        value.m_data = std::monostate{};
-        break;
+        return {};
     case 1:
-        value.m_data = read_primitive<int32_t>(is);
-        break;
+        return read_numeric<std::int32_t>(input);
     case 2:
-        value.m_data = read_primitive<uint32_t>(is);
-        break;
+        return read_numeric<std::uint32_t>(input);
     case 3:
-        value.m_data = read_primitive<int64_t>(is);
-        break;
+        return read_numeric<std::int64_t>(input);
     case 4:
-        value.m_data = read_primitive<uint64_t>(is);
-        break;
+        return read_numeric<std::uint64_t>(input);
     case 5:
-        value.m_data = read_primitive<char>(is);
-        break;
+        return read_numeric<char>(input);
     case 6:
-        value.m_data = read_primitive<unsigned char>(is);
-        break;
+        return read_numeric<unsigned char>(input);
     case 7:
-        value.m_data = read_primitive<float>(is);
-        break;
+        return read_numeric<float>(input);
     case 8:
-        value.m_data = read_primitive<double>(is);
-        break;
+        return read_numeric<double>(input);
     case 9:
-        value.m_data = read_string(is);
-        break;
+    {
+        const auto length = read_primitive<Size>(input);
+        auto text = read_text(input, length);
+        return input ? Value{std::move(text)} : Value{};
+    }
     case 10:
-    { // Array
-        const auto size = read_primitive<Value::Size>(is);
-        Array arr;
-        arr.reserve(size);
-        for (auto i = 0u; i < size; ++i)
+    {
+        const auto count = read_primitive<Size>(input);
+        Array array;
+        for (Size i = 0; input && i < count; ++i)
         {
-            arr.push_back(read_binary(is));
+            auto child = read_binary(input);
+            if (input)
+            {
+                array.push_back(std::move(child));
+            }
         }
-        value.m_data = std::move(arr);
-        break;
+        return input ? Value{std::move(array)} : Value{};
     }
     case 11:
-    { // Object
-        const auto size = read_primitive<Value::Size>(is);
-        Object obj;
-        obj.reserve(size);
-        for (auto i = 0u; i < size; ++i)
+    {
+        const auto count = read_primitive<Size>(input);
+        Object object;
+        for (Size i = 0; input && i < count; ++i)
         {
-            const auto key = read_string(is);
-            obj.emplace(key, read_binary(is));
+            const auto key_length = read_primitive<std::size_t>(input);
+            auto key = read_text(input, key_length);
+            if (!input)
+            {
+                break;
+            }
+            auto child = read_binary(input);
+            if (input && !object.emplace(std::move(key), std::move(child)).second)
+            {
+                input.setstate(std::ios::failbit);
+            }
         }
-        value.m_data = std::move(obj);
-        break;
+        return input ? Value{std::move(object)} : Value{};
     }
     case 12:
     {
-        uint8_t byte = 0;
-        if (is.read(reinterpret_cast<char *>(&byte), sizeof(byte)) && byte <= 1)
+        const auto byte = read_primitive<std::uint8_t>(input);
+        if (input && byte <= 1)
         {
-            value.m_data = byte == 1;
+            return Value{byte == 1};
         }
         break;
     }
-    default: /* do nothing */
-        break;
     }
-
-    return value;
+    input.setstate(std::ios::failbit);
+    return {};
 }

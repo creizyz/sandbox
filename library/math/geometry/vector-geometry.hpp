@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <concepts>
+#include <limits>
 
 #include "math/linear-algebra/matrix.hpp"
 #include "math/linear-algebra/vectors.hpp"
@@ -47,10 +48,25 @@ namespace math
     template <typename T>
     constexpr Vector3<T> rotate(const Vector3<T> &v, const Quaternion<T> &q)
     {
-        // Standard formula: v' = v + 2 * cross(q.x()yz, cross(q.x()yz, v) + q.w * v)
-        Vector3<T> qv{q.x(), q.y(), q.z()};
-        Vector3<T> t = static_cast<T>(2) * cross(qv, v);
-        return v + q.w() * t + cross(qv, t);
+        const Vector3<T> axis{q.x(), q.y(), q.z()};
+        const auto apply_rotation = [&](const Vector3<T> &input)
+        {
+            const auto twice_cross = static_cast<T>(2) * cross(axis, input);
+            return input + q.w() * twice_cross + cross(axis, twice_cross);
+        };
+        if constexpr (std::floating_point<T>)
+        {
+            constexpr T limit = std::numeric_limits<T>::max() / T{8};
+            if (std::abs(v.x()) > limit || std::abs(v.y()) > limit || std::abs(v.z()) > limit)
+            {
+                // Leave room for the cross products. Restore any subnormal components
+                // lost when scaling a vector that mixes very large and very small values.
+                const auto scaled = v * T{0.125};
+                const auto residual = v - scaled * T{8};
+                return apply_rotation(scaled) * T{8} + apply_rotation(residual);
+            }
+        }
+        return apply_rotation(v);
     }
 
     template <std::floating_point T>

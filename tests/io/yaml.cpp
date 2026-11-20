@@ -105,6 +105,23 @@ missing:
         EXPECT_FALSE(write_yaml(DocumentValue{DocumentValue::Array{*value}}));
     }
 
+    TEST(Yaml, ReaderErrorsCountCharactersFromTheStartOfTheStream)
+    {
+        auto utf8 = parse_yaml("\xef\xbb\xbf# header\r\nkey: \xc3\xa9\xff");
+        ASSERT_FALSE(utf8);
+        ASSERT_TRUE(utf8.error().m_location);
+        EXPECT_EQ(utf8.error().m_location->m_line, 2);
+        EXPECT_EQ(utf8.error().m_location->m_column, 7);
+
+        // UTF-16LE BOM, a newline, one supplementary character, then an incomplete unit.
+        constexpr char utf16[] = "\xff\xfe#\0\n\0\x3d\xd8\x00\xde\xff";
+        auto result = parse_yaml(std::string_view{utf16, sizeof(utf16) - 1});
+        ASSERT_FALSE(result);
+        ASSERT_TRUE(result.error().m_location);
+        EXPECT_EQ(result.error().m_location->m_line, 2);
+        EXPECT_EQ(result.error().m_location->m_column, 2);
+    }
+
     TEST(Yaml, HandlesStreamsAndRejectsInvalidOutput)
     {
         std::istringstream input{"# configuration\nname: example\n"};

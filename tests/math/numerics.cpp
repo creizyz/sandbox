@@ -9,6 +9,66 @@
 
 namespace math::tests
 {
+    TEST(VectorNumerics, TransformBorrowsNoncopyableCallablesAtEveryDimension)
+    {
+        struct CountingOperation
+        {
+            int calls = 0;
+            CountingOperation() = default;
+            CountingOperation(const CountingOperation &) = delete;
+            int operator()(int a, int b = 0)
+            {
+                return a + b + ++calls;
+            }
+        };
+        const auto verify = []<std::size_t N>()
+        {
+            CountingOperation operation;
+            const auto ones = Vector<N, int>::one;
+            const auto unary = ones.transform(operation);
+            EXPECT_EQ(unary[N - 1], 1 + static_cast<int>(N));
+            const auto binary = ones.transform(ones, operation);
+            EXPECT_EQ(binary[N - 1], 2 + static_cast<int>(2 * N));
+        };
+        verify.template operator()<4>();
+        verify.template operator()<5>();
+    }
+
+    TEST(VectorNumerics, DividesBySubnormalScalarsWithoutOverflowing)
+    {
+        const auto tiny = std::numeric_limits<double>::denorm_min();
+        const auto quotient = Vector2d{tiny, 0.0} / tiny;
+        EXPECT_EQ(quotient.x(), 1.0);
+        EXPECT_EQ(quotient.y(), 0.0);
+
+        double x = tiny, y = 0.0;
+        VectorView2<double>{&x, &y}.divide(tiny);
+        EXPECT_EQ(x, 1.0);
+        EXPECT_EQ(y, 0.0);
+    }
+
+    TEST(VectorNumerics, MixedViewComparisonsAreSymmetric)
+    {
+        int one = 1;
+        double fraction = 1.5;
+        VectorView<1, int> integral{&one};
+        VectorView<1, double> floating{&fraction};
+        EXPECT_FALSE(integral == floating);
+        EXPECT_FALSE(floating == integral);
+        fraction = 1.0 + epsilon_v<double> / 2;
+        EXPECT_TRUE(integral == floating);
+        EXPECT_TRUE(floating == integral);
+        EXPECT_FALSE(integral.equals(floating));
+        EXPECT_FALSE(floating.equals(integral));
+
+        int negative = -1;
+        unsigned maximum = std::numeric_limits<unsigned>::max();
+        VectorView<1, int> signed_view{&negative};
+        VectorView<1, unsigned> unsigned_view{&maximum};
+        EXPECT_FALSE(signed_view == unsigned_view);
+        EXPECT_FALSE(unsigned_view == signed_view);
+    }
+
     TEST(VectorNumerics, PredicatesShortCircuitOnEitherSideOfUnrollThreshold)
     {
         const auto verify = []<std::size_t N>()

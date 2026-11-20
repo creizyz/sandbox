@@ -299,7 +299,7 @@ namespace math::tests
         EXPECT_EQ(c, 15);
     }
 
-    TEST(VectorView, Divide_FloatUsesReciprocalPath)
+    TEST(VectorView, DivideScalesFloatingComponents)
     {
         float a = 10.0f, b = 20.0f, c = 30.0f;
         VectorView<3, float> v(&a, &b, &c);

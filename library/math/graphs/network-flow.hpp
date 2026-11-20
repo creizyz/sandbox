@@ -157,6 +157,12 @@ namespace math
         std::vector<std::size_t> next_arc(size);
         std::vector<std::size_t> queue;
         queue.reserve(size);
+        struct PathStep
+        {
+            std::size_t node;
+            FlowValue available;
+        };
+        std::vector<PathStep> path;
         FlowValue total = 0;
         while (total < limit)
         {
@@ -181,23 +187,38 @@ namespace math
                 break;
             }
             std::fill(next_arc.begin(), next_arc.end(), 0);
-            const auto send = [&](auto &&self, std::size_t node, FlowValue available) -> FlowValue
+            const auto send = [&](FlowValue available) -> FlowValue
             {
-                if (node == sink)
+                path.clear();
+                path.push_back({source, available});
+                while (!path.empty())
                 {
-                    return available;
-                }
-                const auto &row = residual.outgoing(node);
-                for (auto &index = next_arc[node]; index < row.size(); ++index)
-                {
-                    const auto &arc = row[index];
-                    if (arc.capacity > 0 && level[arc.target] == level[node] + 1)
+                    const auto [node, amount] = path.back();
+                    if (node == sink)
                     {
-                        const auto sent = self(self, arc.target, std::min(available, arc.capacity));
-                        if (sent > 0)
+                        path.pop_back();
+                        for (const auto &step : path)
                         {
-                            residual.push(node, index, sent);
-                            return sent;
+                            residual.push(step.node, next_arc[step.node], amount);
+                        }
+                        return amount;
+                    }
+                    const auto &row = residual.outgoing(node);
+                    auto &index = next_arc[node];
+                    while (index < row.size() && (row[index].capacity == 0 || level[row[index].target] != level[node] + 1))
+                    {
+                        ++index;
+                    }
+                    if (index < row.size())
+                    {
+                        path.push_back({row[index].target, std::min(amount, row[index].capacity)});
+                    }
+                    else
+                    {
+                        path.pop_back();
+                        if (!path.empty())
+                        {
+                            ++next_arc[path.back().node];
                         }
                     }
                 }
@@ -205,7 +226,7 @@ namespace math
             };
             while (total < limit)
             {
-                const auto sent = send(send, source, limit - total);
+                const auto sent = send(limit - total);
                 if (sent == 0)
                 {
                     break;

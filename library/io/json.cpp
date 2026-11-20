@@ -407,39 +407,6 @@ namespace io
             bool m_pretty;
             std::string m_output;
 
-            std::expected<void, JsonError> write_value(const DocumentValue &value, std::size_t depth)
-            {
-                return std::visit([&](const auto &item) -> std::expected<void, JsonError>
-                                  {
-                    using T = std::decay_t<decltype(item)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>)
-                    {
-                        m_output += "null";
-                    }
-                    else if constexpr (std::is_same_v<T, bool>)
-                    {
-                        m_output += item ? "true" : "false";
-                    }
-                    else if constexpr (std::is_same_v<T, Number>)
-                    {
-                        std::size_t pos = 0;
-                        if (!detail::scan_number(item.m_text, pos) || pos != item.m_text.size())
-                        {
-                            return std::unexpected(JsonError{"invalid number", std::nullopt});
-                        }
-                        m_output += item.m_text;
-                    }
-                    else if constexpr (std::is_same_v<T, std::string>)
-                    {
-                        return write_string(item);
-                    }
-                    else
-                    {
-                        return write_collection(item, depth);
-                    }
-                    return {}; }, value.m_data);
-            }
-
             template <typename Collection>
             std::expected<void, JsonError> write_collection(const Collection &values, std::size_t depth)
             {
@@ -481,6 +448,39 @@ namespace io
                 }
                 m_output += is_object ? '}' : ']';
                 return {};
+            }
+
+            std::expected<void, JsonError> write_value(const DocumentValue &value, std::size_t depth)
+            {
+                return std::visit([&](const auto &item) -> std::expected<void, JsonError>
+                                  {
+                    using T = std::decay_t<decltype(item)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>)
+                    {
+                        m_output += "null";
+                    }
+                    else if constexpr (std::is_same_v<T, bool>)
+                    {
+                        m_output += item ? "true" : "false";
+                    }
+                    else if constexpr (std::is_same_v<T, Number>)
+                    {
+                        std::size_t pos = 0;
+                        if (!detail::scan_number(item.m_text, pos) || pos != item.m_text.size())
+                        {
+                            return std::unexpected(JsonError{"invalid number", std::nullopt});
+                        }
+                        m_output += item.m_text;
+                    }
+                    else if constexpr (std::is_same_v<T, std::string>)
+                    {
+                        return write_string(item);
+                    }
+                    else
+                    {
+                        return write_collection(item, depth);
+                    }
+                    return {}; }, value.m_data);
             }
 
             void indent(std::size_t depth)

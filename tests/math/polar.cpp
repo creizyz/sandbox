@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 #include "math/numerics/interpolation.hpp"
@@ -59,6 +60,16 @@ namespace math::tests
         EXPECT_FLOAT_EQ(origin.radius(), 0.0f);
         EXPECT_FLOAT_EQ(origin.angle(), 0.0f);
         EXPECT_TRUE(std::isfinite(Polar2d::from_cartesian(Vector2d{1e200, 1e200}).radius()));
+    }
+
+    TEST(Polar, LargeFiniteAnglesRetainCartesianPhase)
+    {
+        for (const double angle : {1e20, -1e20, std::numeric_limits<double>::max()})
+        {
+            const auto cartesian = Polar2d{1.0, angle}.to_cartesian();
+            EXPECT_NEAR(cartesian.x(), std::cos(angle), 1e-15);
+            EXPECT_NEAR(cartesian.y(), std::sin(angle), 1e-15);
+        }
     }
 
     TEST(Polar, RotatesInRadiansAndPreservesRadius)

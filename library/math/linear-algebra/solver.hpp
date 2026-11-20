@@ -80,19 +80,37 @@ namespace math
                     continue;
                 }
                 const T multiplier = target[column] / pivot_row[column];
-                if (!std::isfinite(multiplier))
+                const auto eliminate = [&](auto contribution)
                 {
-                    throw std::overflow_error("Linear solve multiplier exceeds the scalar range");
-                }
-                for (std::size_t k = column + 1; k < size; ++k)
-                {
-                    target[k] -= multiplier * pivot_row[k];
-                    if (!std::isfinite(target[k]))
+                    for (std::size_t k = column + 1; k < size; ++k)
                     {
-                        throw std::overflow_error("Linear solve coefficient exceeds the scalar range");
+                        target[k] -= contribution(pivot_row[k]);
+                        if (!std::isfinite(target[k]))
+                        {
+                            throw std::overflow_error("Linear solve coefficient exceeds the scalar range");
+                        }
                     }
+                    result[row] -= contribution(result[column]);
+                };
+                if (std::isnormal(multiplier))
+                {
+                    eliminate([multiplier](T value)
+                              { return multiplier * value; });
                 }
-                result[row] -= multiplier * result[column];
+                else
+                {
+                    // The multiplier can be outside the scalar range even though its
+                    // product with a coefficient or the right-hand side is representable.
+                    int numerator_exponent, denominator_exponent;
+                    const T fraction = std::frexp(target[column], &numerator_exponent) /
+                                       std::frexp(pivot_row[column], &denominator_exponent);
+                    const int exponent = numerator_exponent - denominator_exponent;
+                    eliminate([fraction, exponent](T value)
+                              {
+                                  int value_exponent;
+                                  const T value_fraction = std::frexp(value, &value_exponent);
+                                  return std::ldexp(fraction * value_fraction, exponent + value_exponent); });
+                }
                 if (!std::isfinite(result[row]))
                 {
                     throw std::overflow_error("Linear solve right-hand side exceeds the scalar range");

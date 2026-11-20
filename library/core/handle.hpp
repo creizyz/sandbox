@@ -1,10 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <vector>
-
-class HandleRegister;
 
 struct Handle
 {
@@ -12,6 +11,7 @@ struct Handle
 
     uint32_t m_id{invalid_id};
     uint32_t m_generation{0};
+    std::uint64_t m_owner{0};
 
     [[nodiscard]] constexpr bool is_valid() const noexcept
     {
@@ -25,6 +25,12 @@ public:
     static constexpr auto invalid_id = std::numeric_limits<std::uint32_t>::max();
     static constexpr auto invalid_index = std::numeric_limits<std::uint32_t>::max();
 
+    HandleRegister() noexcept;
+    HandleRegister(const HandleRegister &other);
+    HandleRegister(HandleRegister &&other) noexcept;
+    HandleRegister &operator=(const HandleRegister &other);
+    HandleRegister &operator=(HandleRegister &&other) noexcept;
+
     void reserve(std::size_t handle_capacity, std::size_t index_capacity);
     void resize(std::size_t handle_capacity, std::size_t index_capacity);
 
@@ -37,8 +43,15 @@ public:
     [[nodiscard]] Handle get_handle(uint32_t index) const noexcept;
 
 private:
-    std::vector<uint32_t> m_id_to_index;
+    struct Slot
+    {
+        uint32_t index{invalid_index};
+        uint32_t generation{0};
+    };
+
+    void swap(HandleRegister &other) noexcept;
+    std::uint64_t m_owner;
+    std::vector<Slot> m_slots;
     std::vector<uint32_t> m_index_to_id;
-    std::vector<uint32_t> m_generations;
     std::vector<uint32_t> m_free_ids;
 };

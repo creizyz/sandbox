@@ -16,18 +16,32 @@ namespace math
     template <std::floating_point T = double>
     class RunningStatistics
     {
+        template <std::floating_point>
+        friend class RunningCovariance;
+
         std::uint64_t m_count{0};
-        T m_mean{0};
+        T m_origin{0};
+        T m_mean_offset{0};
         T m_squared_deviation{0};
 
-        void update(std::uint64_t count, T mean, T squared_deviation)
+        [[nodiscard]] T difference_from_mean(T value) const noexcept
+        {
+            return (value - m_origin) - m_mean_offset;
+        }
+
+        [[nodiscard]] T mean_difference(const RunningStatistics &other) const noexcept
+        {
+            return (other.m_origin - m_origin) + (other.m_mean_offset - m_mean_offset);
+        }
+
+        void update(std::uint64_t count, T mean_offset, T squared_deviation)
         {
             if (!std::isfinite(squared_deviation))
             {
                 throw std::overflow_error("Accumulated squared deviation exceeds the scalar range");
             }
             m_count = count;
-            m_mean = mean;
+            m_mean_offset = mean_offset;
             m_squared_deviation = squared_deviation;
         }
 
@@ -44,12 +58,14 @@ namespace math
             }
             if (m_count == 0)
             {
-                update(1, value, T{0});
+                m_origin = value;
+                m_count = 1;
                 return;
             }
             const auto count = m_count + 1;
-            const auto mean = std::lerp(m_mean, value, T{1} / static_cast<T>(count));
-            update(count, mean, m_squared_deviation + (value - m_mean) * (value - mean));
+            const T delta = difference_from_mean(value);
+            const T mean_offset = m_mean_offset + delta / static_cast<T>(count);
+            update(count, mean_offset, m_squared_deviation + delta * ((value - m_origin) - mean_offset));
         }
 
         // Results are reproducible for a fixed sample and merge order.
@@ -70,10 +86,10 @@ namespace math
             }
             const auto count = m_count + other.m_count;
             const auto right_fraction = static_cast<T>(other.m_count) / static_cast<T>(count);
-            const auto delta = other.m_mean - m_mean;
-            const auto mean = std::lerp(m_mean, other.m_mean, right_fraction);
+            const auto delta = mean_difference(other);
+            const auto mean_offset = m_mean_offset + delta * right_fraction;
             const auto correction = delta * (delta * (static_cast<T>(m_count) * right_fraction));
-            update(count, mean, m_squared_deviation + other.m_squared_deviation + correction);
+            update(count, mean_offset, m_squared_deviation + other.m_squared_deviation + correction);
         }
 
         [[nodiscard]] std::uint64_t count() const noexcept
@@ -83,7 +99,7 @@ namespace math
 
         [[nodiscard]] std::optional<T> mean() const noexcept
         {
-            return m_count == 0 ? std::nullopt : std::optional<T>{m_mean};
+            return m_count == 0 ? std::nullopt : std::optional<T>{m_origin + m_mean_offset};
         }
 
         [[nodiscard]] std::optional<T> population_variance() const noexcept
@@ -185,7 +201,7 @@ namespace math
             auto next_y = m_y;
             next_x.add(x);
             next_y.add(y);
-            const T cross = m_x.count() == 0 ? T{0} : m_cross + (x - *m_x.mean()) * (y - *next_y.mean());
+            const T cross = m_x.count() == 0 ? T{0} : m_cross + m_x.difference_from_mean(x) * next_y.difference_from_mean(y);
             update(next_x, next_y, cross);
         }
 
@@ -205,8 +221,8 @@ namespace math
             next_x.merge(other.m_x);
             next_y.merge(other.m_y);
             const auto factor = static_cast<T>(count()) * (static_cast<T>(other.count()) / static_cast<T>(next_x.count()));
-            const auto change_x = *other.m_x.mean() - *m_x.mean();
-            const auto change_y = *other.m_y.mean() - *m_y.mean();
+            const auto change_x = m_x.mean_difference(other.m_x);
+            const auto change_y = m_y.mean_difference(other.m_y);
             update(next_x, next_y, m_cross + other.m_cross + change_x * (change_y * factor));
         }
 
@@ -279,7 +295,6 @@ namespace math
             {
                 throw std::overflow_error("Statistics weight exceeds the scalar range");
             }
-            const T fraction = weight / total;
             const T delta = mean - m_mean;
             const T correction = delta * (delta * (std::min(weight, m_weight) * (std::max(weight, m_weight) / total)));
             const T next_squared_deviation = m_squared_deviation + squared_deviation + correction;
@@ -287,7 +302,8 @@ namespace math
             {
                 throw std::overflow_error("Weighted squared deviation exceeds the scalar range");
             }
-            m_mean = std::lerp(m_mean, mean, fraction);
+            m_mean = weight <= m_weight ? std::lerp(m_mean, mean, weight / total)
+                                        : std::lerp(mean, m_mean, m_weight / total);
             m_weight = total;
             m_squared_deviation = next_squared_deviation;
         }

@@ -55,6 +55,18 @@ namespace math::tests
         EXPECT_EQ(lerp(Vector2d::zero, end, 1.5), end);
     }
 
+    TEST(Interpolation, BoundedMovementWorksAtTinyAndOverflowingDistances)
+    {
+        const Vector2d close{1e-6, 0.0};
+        EXPECT_EQ(move_towards(Vector2d::zero, close, 0.0).x(), 0.0);
+        EXPECT_DOUBLE_EQ(move_towards(Vector2d::zero, close, 1e-8).x(), 1e-8);
+        constexpr auto maximum = std::numeric_limits<double>::max();
+        const auto diagonal = move_towards(Vector2d::zero, Vector2d{maximum, maximum}, 1.0);
+        EXPECT_DOUBLE_EQ(diagonal.x(), std::sqrt(0.5));
+        EXPECT_DOUBLE_EQ(diagonal.y(), std::sqrt(0.5));
+        EXPECT_EQ(move_towards(Vector2d{-maximum, 0.0}, Vector2d{maximum, 0.0}, maximum).x(), 0.0);
+    }
+
     TEST(Interpolation, EasingClampsAndIsSymmetric)
     {
         static_assert(smoothstep(-1.0) == 0.0);

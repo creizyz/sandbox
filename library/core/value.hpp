@@ -29,6 +29,7 @@ public:
 
 private:
     Data m_data;
+    void write_binary_unchecked(std::ostream &output) const;
 
 public:
     Value()
@@ -89,6 +90,6 @@ public:
         return std::get<T>(m_data);
     }
 
-    void write_binary(std::ostream &os) const noexcept;
-    static Value read_binary(std::istream &is) noexcept;
+    void write_binary(std::ostream &os) const;
+    static Value read_binary(std::istream &is);
 };

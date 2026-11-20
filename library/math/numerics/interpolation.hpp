@@ -6,6 +6,7 @@
 #include <cmath>
 #include <concepts>
 #include <cstddef>
+#include <limits>
 #include <numbers>
 #include <stdexcept>
 
@@ -177,13 +178,26 @@ namespace math
     template <std::floating_point T, std::size_t N>
     constexpr Vector<N, T> move_towards(const Vector<N, T> &current, const Vector<N, T> &target, T max_distance_delta)
     {
-        Vector<N, T> to_target = target - current;
-        T dist = to_target.length();
-        if (dist <= max_distance_delta || dist < epsilon_v<T>)
+        if (max_distance_delta == T{0})
+        {
+            return current;
+        }
+        auto displacement = target - current;
+        T scale{1};
+        if (displacement.any([](T component)
+                             { return std::isinf(component); }))
+        {
+            scale = T{0.5};
+            displacement = target * scale - current * scale;
+        }
+        const auto norm = detail::scaled_norm<T>(N, [&](std::size_t i)
+                                                 { return displacement[i]; });
+        if (norm.m_scale == T{0} || norm.length() <= max_distance_delta * scale)
         {
             return target;
         }
-        return current + (to_target / dist) * max_distance_delta;
+        return current + displacement.transform([&](T component)
+                                                { return norm.normalize(component) * max_distance_delta; });
     }
 
     enum class PolarArc
@@ -249,6 +263,18 @@ namespace math
         {
             throw std::invalid_argument("Exponential smoothing requires finite values, a nonnegative duration, and a positive time constant");
         }
-        return std::lerp(current, target, -std::expm1(-duration / time_constant));
+        const T elapsed = duration / time_constant;
+        if (elapsed < std::numbers::ln2_v<T>)
+        {
+            return std::lerp(current, target, -std::expm1(-elapsed));
+        }
+        const T remaining = std::exp(-elapsed);
+        if (remaining < std::numeric_limits<T>::min())
+        {
+            // The complete decay factor can underflow while the displacement still fits.
+            const T half = std::exp(-elapsed / T{2});
+            return std::lerp(target, std::lerp(target, current, half), half);
+        }
+        return std::lerp(target, current, remaining);
     }
 }

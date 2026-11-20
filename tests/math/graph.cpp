@@ -196,6 +196,20 @@ namespace math::tests
         EXPECT_EQ(max_flow(graph, 3, 0).value, 0);
     }
 
+    TEST(NetworkFlow, SupportsLongAugmentingPaths)
+    {
+        constexpr NodeId count = 100000;
+        FlowNetwork chain(count);
+        for (NodeId node = 1; node < count; ++node)
+        {
+            chain.add_arc(node - 1, node, 3);
+        }
+        const auto result = max_flow(chain, 0, count - 1);
+        EXPECT_EQ(result.value, 3);
+        EXPECT_TRUE(std::ranges::all_of(result.arc_flows, [](FlowValue flow)
+                                        { return flow == 3; }));
+    }
+
     TEST(NetworkFlow, MinimumCostUsesReverseArcToImproveEarlierAllocation)
     {
         FlowNetwork graph(6);

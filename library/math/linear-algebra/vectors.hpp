@@ -13,6 +13,12 @@
 
 namespace math
 {
+    namespace detail
+    {
+        template <typename V, int Component>
+        inline constexpr V uniform_vector = V::fill(Component);
+    }
+
     template <std::size_t N, typename T>
     inline constexpr std::size_t vector_alignment_v = (sizeof(T) * N >= 16 ? 16 : alignof(std::array<T, N>));
 
@@ -74,8 +80,8 @@ namespace math
         }
 
         template <typename Op>
-            requires(std::invocable<Op &, T> && std::is_convertible_v<std::invoke_result_t<Op &, T>, T>)
-        [[nodiscard]] constexpr Vector<N, T> transform(Op &&op) const noexcept(noexcept(std::invoke(op, T{})))
+            requires std::is_invocable_r_v<T, Op &, const T &>
+        [[nodiscard]] constexpr Vector<N, T> transform(Op &&op) const noexcept(std::is_nothrow_invocable_r_v<T, Op &, const T &>)
         {
             if constexpr (N <= K_UNROLL_THRESHOLD)
             {
@@ -84,18 +90,17 @@ namespace math
             else
             {
                 Vector<N, T> out{};
-                auto fn = std::forward<Op>(op);
                 for (std::size_t i = 0; i < N; ++i)
                 {
-                    out.m_data[i] = static_cast<T>(std::invoke(fn, m_data[i]));
+                    out.m_data[i] = static_cast<T>(std::invoke(op, m_data[i]));
                 }
                 return out;
             }
         }
 
         template <typename Op>
-            requires(std::invocable<Op &, T, T> && std::is_convertible_v<std::invoke_result_t<Op &, T, T>, T>)
-        [[nodiscard]] constexpr Vector<N, T> transform(const Vector<N, T> &other, Op &&op) const noexcept(noexcept(std::invoke(op, T{}, T{})))
+            requires std::is_invocable_r_v<T, Op &, const T &, const T &>
+        [[nodiscard]] constexpr Vector<N, T> transform(const Vector<N, T> &other, Op &&op) const noexcept(std::is_nothrow_invocable_r_v<T, Op &, const T &, const T &>)
         {
             if constexpr (N <= K_UNROLL_THRESHOLD)
             {
@@ -104,10 +109,9 @@ namespace math
             else
             {
                 Vector<N, T> out{};
-                auto fn = std::forward<Op>(op);
                 for (std::size_t i = 0; i < N; ++i)
                 {
-                    out.m_data[i] = static_cast<T>(std::invoke(fn, m_data[i], other.m_data[i]));
+                    out.m_data[i] = static_cast<T>(std::invoke(op, m_data[i], other.m_data[i]));
                 }
                 return out;
             }
@@ -228,8 +232,8 @@ namespace math
 
         // --- Constants ---
 
-        static constexpr Vector<N, T> zero = fill(static_cast<T>(0));
-        static constexpr Vector<N, T> one = fill(static_cast<T>(1));
+        static constexpr const Vector &zero = detail::uniform_vector<Vector, 0>;
+        static constexpr const Vector &one = detail::uniform_vector<Vector, 1>;
 
         static constexpr std::size_t size() noexcept
         {
@@ -305,18 +309,9 @@ namespace math
             requires std::is_convertible_v<U, T>
         [[nodiscard]] constexpr Vector<N, T> operator/(U scalar) const noexcept
         {
-            if constexpr (std::is_floating_point_v<T>)
-            {
-                const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-                return transform([inv](T val)
-                                 { return val * inv; });
-            }
-            else
-            {
-                const auto s = static_cast<T>(scalar);
-                return transform([s](T val)
-                                 { return val / s; });
-            }
+            const auto divisor = static_cast<T>(scalar);
+            return transform([divisor](T val)
+                             { return val / divisor; });
         }
 
         // --- Vector Arithmetic ---
@@ -502,19 +497,15 @@ namespace math
         }
 
         template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op &, T>, T>
         constexpr Vector<N, T> transform_impl(Op &&op, std::index_sequence<I...>) const
         {
-            auto fn = std::forward<Op>(op);
-            return Vector{static_cast<T>(std::invoke(fn, m_data[I]))...};
+            return Vector{static_cast<T>(std::invoke(op, m_data[I]))...};
         }
 
         template <typename Op, std::size_t... I>
-            requires std::convertible_to<std::invoke_result_t<Op &, T, T>, T>
         constexpr Vector<N, T> transform_impl(const Vector<N, T> &other, Op &&op, std::index_sequence<I...>) const
         {
-            auto fn = std::forward<Op>(op);
-            return Vector{static_cast<T>(std::invoke(fn, m_data[I], other.m_data[I]))...};
+            return Vector{static_cast<T>(std::invoke(op, m_data[I], other.m_data[I]))...};
         }
 
         template <std::size_t... I>

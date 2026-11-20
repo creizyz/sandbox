@@ -6,7 +6,8 @@
 `emplace()` appends a row and returns its handle. `resize()` appends zero-filled rows or removes
 rows from the end. `handle_at()` retrieves a row handle by index, and `get()` resolves a handle to
 an optional view. Handles belong to the container that issued them and transfer with its storage
-on move construction.
+on move construction. A foreign or stale handle gives an empty result from `get()` and
+`false` from `erase()`. A copied `HandleRegister` issues independent handles for the copied rows.
 
 Handles to surviving rows remain valid through capacity changes, resizing, and swap-erase of
 another row. Erasing a row or calling `clear()` invalidates the removed row handles. Iteration
@@ -25,7 +26,10 @@ as in C++.
 [`Vector`](../linear-algebra/vectors.hpp) and [`VectorView`](../linear-algebra/vectors-view.hpp) scale components before taking
 the Euclidean norm. In-place normalization leaves near-zero and non-finite inputs alone.
 `Vector::normalized()` returns a zero vector for those inputs. `VectorView::near_equals()` rejects
-NaN components and treats matching infinities as equal.
+NaN components and treats matching infinities as equal. Mixed-type views compare in a common
+arithmetic type and use the same tolerance in either operand order.
+`Vector::zero` and `Vector::one` are constant-expression references to immutable vectors.
+Use `std::remove_cvref_t` when deriving a value type from their declared types.
 
 `rotate()` expects a unit quaternion. Reflection expects a unit normal, and refraction expects
 unit incident and normal vectors.

@@ -100,6 +100,20 @@ namespace math::tests
         EXPECT_EQ(sum, 25);
     }
 
+    TEST(VectorSoa, RejectsHandlesFromOtherContainers)
+    {
+        Rows first, second;
+        const auto a = first.emplace(1, 2, 3);
+        const auto b = second.emplace(4, 5, 6);
+        EXPECT_FALSE(second.get(a));
+        EXPECT_FALSE(second.erase(a));
+        Rows moved{std::move(second)};
+        second.emplace(7, 8, 9);
+        EXPECT_FALSE(second.get(b));
+        EXPECT_TRUE(moved.get(b));
+        EXPECT_FALSE(moved.erase(a));
+    }
+
     TEST(VectorSoa, LeavesExistingRowsIntactWhenAnInputConversionThrows)
     {
         struct ThrowingInput

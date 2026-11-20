@@ -1,6 +1,6 @@
 # Build and validation
 
-The project uses CMake and C++23, with a C compiler for LibYAML. One verified environment is WSL Ubuntu with GCC 15.2,
+The project uses CMake 3.24 or later and C++23, with a C compiler for LibYAML. One verified environment is WSL Ubuntu with GCC 15.2,
 CMake 4.2.3, and Ninja. The root configuration defines the `sandbox` library. `app/` is reserved
 for a future executable.
 

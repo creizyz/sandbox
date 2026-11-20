@@ -97,6 +97,46 @@ namespace math::tests
         EXPECT_EQ(extreme.count(), 1u);
     }
 
+    TEST(RunningStatistics, PreservesDispersionSmallerThanAnUlpOfTheMean)
+    {
+        constexpr double large = 0x1p53;
+        for (const double first : {large, large + 2.0})
+        {
+            const double second = first == large ? large + 2.0 : large;
+            RunningStatistics<> moments;
+            RunningCovariance<> pairs;
+            moments.add(first);
+            moments.add(second);
+            pairs.add(first, first);
+            pairs.add(second, second);
+            EXPECT_EQ(moments.sample_variance(), 2.0);
+            EXPECT_EQ(pairs.sample_covariance(), 2.0);
+            EXPECT_DOUBLE_EQ(*pairs.correlation(), 1.0);
+            ASSERT_TRUE(pairs.linear_fit());
+            EXPECT_EQ(pairs.linear_fit()->slope, 1.0);
+        }
+        RunningStatistics<> left;
+        RunningStatistics<> right;
+        left.add(large);
+        left.add(large + 2.0);
+        right.add(large + 4.0);
+        left.merge(right);
+        EXPECT_EQ(left.sample_variance(), 4.0);
+    }
+
+    TEST(WeightedStatistics, PreservesTheSmallerWeightsContributionInEitherOrder)
+    {
+        WeightedStatistics<> light;
+        WeightedStatistics<> heavy;
+        light.add(1e16, 1.0);
+        heavy.add(0.0, 1e16);
+        auto forward = light;
+        forward.merge(heavy);
+        heavy.merge(light);
+        EXPECT_DOUBLE_EQ(*forward.mean(), 1.0);
+        EXPECT_DOUBLE_EQ(*heavy.mean(), 1.0);
+    }
+
     TEST(Quantile, InterpolatesBetweenOrderStatisticsWithoutMutatingInput)
     {
         constexpr std::array samples{10.0, 2.0, 2.0, 6.0};

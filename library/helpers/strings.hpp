@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <locale>
+#include <string_view>
 
 namespace str
 {

@@ -1,323 +1,199 @@
 #include "module.hpp"
 
-IModule::IModule(ExecutionMode mode, double frequency_hz)
-    : m_state{ State::CREATED }
-    , m_mode{ mode }
-    , m_frequency_hz{ frequency_hz }
-{ }
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+#include <utility>
 
-IModule::~IModule()
+ModuleRunner::ModuleRunner(std::unique_ptr<IModule> module, ExecutionMode mode, double frequency_hz)
+    : m_module{std::move(module)}
 {
-    this->stop();
+    if (!m_module)
+    {
+        throw std::invalid_argument("module is required");
+    }
+    set_execution_mode(mode, frequency_hz);
+}
+
+ModuleRunner::~ModuleRunner()
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_shutdown = true;
+    }
+    m_cv.notify_all();
     if (m_thread.joinable())
     {
         m_thread.join();
     }
-    this->release();
-}
-
-bool IModule::init()
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    switch (m_state)
+    // Explicit stop/release report hook failures. Destruction must finish both cleanup stages.
+    const auto cleanup = [this](bool (IModule::*hook)())
     {
-        case State::CREATED:
+        try
         {
-            if (on_init())
-            {
-                m_state = State::INITIALIZED;
-                return true;
-            }
-            return false;
+            ((*m_module).*hook)();
         }
-        case State::INITIALIZED:
+        catch (...)
         {
-            // do nothing
-            return true;
+            // Keep dismantling the module even when user cleanup throws.
         }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-bool IModule::release()
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    switch (m_state)
-    {
-        case State::INITIALIZED:
-        case State::STOPPED:
-        {
-            if (on_release())
-            {
-                m_state = State::CREATED;
-                return true;
-            }
-            return false;
-        }
-        case State::CREATED:
-        {
-            // do nothing
-            return true;
-        }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-bool IModule::start()
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-    switch (m_state)
-    {
-        case State::INITIALIZED:
-        {
-            if (on_start())
-            {
-                m_state = State::RUNNING;
-                if (!m_thread.joinable())
-                {
-                    m_thread = std::thread(&IModule::run, this);
-                }
-                lock.unlock();
-                m_cv.notify_all();
-                return true;
-            }
-            return false;
-        }
-        case State::PAUSED:
-        {
-            if (on_resume())
-            {
-                m_state = State::RUNNING;
-                lock.unlock();
-                m_cv.notify_all();
-                return true;
-            }
-            return false;
-        }
-        case State::RUNNING:
-        {
-            // do nothing
-            return true;
-        }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-bool IModule::stop()
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-    switch (m_state)
-    {
-        case State::RUNNING:
-        case State::PAUSED:
-        {
-            if (on_stop())
-            {
-                m_state = State::STOPPED;
-                lock.unlock();
-                m_cv.notify_all();
-                return true;
-            }
-            return false;
-        }
-        case State::STOPPED:
-        {
-            // do nothing
-            return true;
-        }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-bool IModule::pause() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    switch (m_state)
-    {
-        case State::RUNNING:
-        {
-            if (on_pause())
-            {
-                m_state = State::STOPPED;
-                return true;
-            }
-            return false;
-        }
-        case State::PAUSED:
-        {
-            // do nothing
-            return true;
-        }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-bool IModule::reset()
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    switch (m_state)
-    {
-        case State::STOPPED:
-        {
-            if (on_reset())
-            {
-                m_state = State::INITIALIZED;
-                return true;
-            }
-            return false;
-        }
-        case State::INITIALIZED:
-        {
-            // do nothing
-            return true;
-        }
-        default:
-        {
-            // TODO: log warning
-            return false;
-        }
-    }
-}
-
-void IModule::set_execution_mode(ExecutionMode mode, double frequency_hz)
-{
-    m_mode = mode;
-    m_frequency_hz = frequency_hz;
-}
-
-bool IModule::on_init()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_release()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_start()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_stop()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_pause()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_resume()
-{
-    // do nothing
-    return true;
-}
-
-bool IModule::on_reset()
-{
-    // do nothing
-    return true;
-}
-
-void IModule::run()
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-
-    auto get_period = [this]() -> std::chrono::duration<double>
-    {
-        return (m_mode == ExecutionMode::FIXED_RATE && m_frequency_hz > 0.0)
-               ? std::chrono::duration<double>(1.0 / m_frequency_hz)
-               : std::chrono::duration<double>::zero();
     };
+    if (m_state == State::RUNNING || m_state == State::PAUSED)
+    {
+        cleanup(&IModule::on_stop);
+        m_state = State::STOPPED;
+    }
+    if (m_state != State::CREATED)
+    {
+        cleanup(&IModule::on_release);
+    }
+}
 
-    auto previous_iteration_timestamp = std::chrono::steady_clock::now();
+bool ModuleRunner::init()
+{
+    return change(State::INITIALIZED, {{State::CREATED, &IModule::on_init}});
+}
 
+bool ModuleRunner::release()
+{
+    return change(State::CREATED, {{State::INITIALIZED, &IModule::on_release}, {State::STOPPED, &IModule::on_release}});
+}
+
+bool ModuleRunner::start()
+{
+    return change(State::RUNNING, {{State::INITIALIZED, &IModule::on_start}, {State::PAUSED, &IModule::on_resume}});
+}
+
+bool ModuleRunner::stop()
+{
+    return change(State::STOPPED, {{State::RUNNING, &IModule::on_stop}, {State::PAUSED, &IModule::on_stop}});
+}
+
+bool ModuleRunner::pause()
+{
+    return change(State::PAUSED, {{State::RUNNING, &IModule::on_pause}});
+}
+
+bool ModuleRunner::reset()
+{
+    return change(State::INITIALIZED, {{State::STOPPED, &IModule::on_reset}});
+}
+
+bool ModuleRunner::is_running() const
+{
+    std::lock_guard lock(m_mutex);
+    return m_state == State::RUNNING;
+}
+
+bool ModuleRunner::change(State target, std::initializer_list<Transition> transitions)
+{
+    std::lock_guard control(m_control);
+    std::unique_lock lock(m_mutex);
+    if (m_state == target)
+    {
+        return true;
+    }
+    if (m_state == State::INITIALIZED && target == State::RUNNING && !m_thread.joinable())
+    {
+        m_thread = std::thread(&ModuleRunner::run, this);
+    }
+    // Stop admitting work before waiting for the current step to finish.
+    m_control_pending = true;
+    m_cv.notify_all();
+    m_cv.wait(lock, [this]
+              { return !m_stepping; });
+    bool success = m_state == target; // An ONCE step may have just completed.
+    const auto action = std::find_if(transitions.begin(), transitions.end(), [this](const auto &entry)
+                                     { return entry.m_source == m_state; });
+    if (action != transitions.end())
+    {
+        lock.unlock();
+        try
+        {
+            success = ((*m_module).*(action->m_hook))();
+        }
+        catch (...)
+        {
+            lock.lock();
+            m_control_pending = false;
+            lock.unlock();
+            m_cv.notify_all();
+            throw;
+        }
+        lock.lock();
+        if (success)
+        {
+            m_state = target;
+            m_schedule_changed = true;
+            if (target == State::RUNNING)
+            {
+                m_last_step = std::chrono::steady_clock::now();
+            }
+        }
+    }
+    m_control_pending = false;
+    lock.unlock();
+    m_cv.notify_all();
+    return success;
+}
+
+void ModuleRunner::set_execution_mode(ExecutionMode mode, double frequency_hz)
+{
+    if (mode == ExecutionMode::FIXED_RATE && (!std::isfinite(frequency_hz) || frequency_hz <= 0.0))
+    {
+        throw std::invalid_argument("fixed rate requires a positive, finite frequency");
+    }
+    {
+        std::lock_guard lock(m_mutex);
+        if (m_mode == mode && m_frequency_hz == frequency_hz)
+        {
+            return;
+        }
+        m_schedule_changed = true;
+        m_mode = mode;
+        m_frequency_hz = frequency_hz;
+    }
+    m_cv.notify_all();
+}
+
+void ModuleRunner::run()
+{
+    using Clock = std::chrono::steady_clock;
+    std::unique_lock lock(m_mutex);
     while (true)
     {
-        // Wait until RUNNING or STOPPED
-        m_cv.wait(lock, [this] {
-            return m_state == State::RUNNING || m_state == State::STOPPED;
-        });
-
-        if (m_state == State::STOPPED)
+        m_cv.wait(lock, [this]
+                  { return m_shutdown || (m_state == State::RUNNING && !m_control_pending); });
+        if (m_shutdown)
         {
-            // TODO add exit log
-            break;
+            return;
         }
-
-        auto now = std::chrono::steady_clock::now();
-        auto dt = std::chrono::duration<double>(now - previous_iteration_timestamp);
-        previous_iteration_timestamp = now;
-
-        auto mode = m_mode;
-        auto period = get_period();
+        const auto mode = m_mode;
+        const auto frequency = m_frequency_hz;
+        const auto now = Clock::now();
+        const auto dt = now - m_last_step;
+        m_last_step = now;
+        m_schedule_changed = false;
+        m_stepping = true;
         lock.unlock();
-
+        m_module->step(dt);
+        lock.lock();
+        m_stepping = false;
+        if (m_control_pending)
+        {
+            m_cv.notify_all();
+        }
         if (mode == ExecutionMode::ONCE)
         {
-            step(dt);
-            lock.lock();
             m_state = State::STOPPED;
-            break;
         }
-
-        if (mode == ExecutionMode::MAX_RATE)
+        else if (mode == ExecutionMode::FIXED_RATE)
         {
-            step(dt);
-            lock.lock();
-            continue;
-        }
-
-        if (mode == ExecutionMode::FIXED_RATE)
-        {
-            // execute current step
-            auto start_timestamp = std::chrono::steady_clock::now();
-            step(dt);
-            auto current_step_duration = std::chrono::steady_clock::now() - start_timestamp;
-
-
-            lock.lock();
-            if (m_state != State::RUNNING) // If paused or stopped, loop up and wait/exit
-            {
-                continue;
-            }
-
-            auto sleep_time = period - current_step_duration;
-            if (sleep_time > std::chrono::duration<double>::zero())
-            {
-                // Sleep but allow interruption by pause/stop or mode change
-                m_cv.wait_for(lock, sleep_time, [this] {
-                    return m_state != State::RUNNING;
-                });
-            }
+            const std::chrono::duration<double> period(1.0 / frequency);
+            const auto deadline = period >= Clock::time_point::max() - now ? Clock::time_point::max() : now + std::chrono::duration_cast<Clock::duration>(period);
+            // Remember even a pause/resume pair that completes before the worker wakes.
+            m_cv.wait_until(lock, deadline, [this]
+                            { return m_shutdown || m_schedule_changed; });
         }
     }
 }
-

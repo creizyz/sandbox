@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(Sandbox VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -10,6 +10,7 @@ endif()
 include(FetchContent)
 include(cmake/CompileDatabases.cmake)
 include(cmake/LibYaml.cmake)
+find_package(Threads REQUIRED)
 
 function(sandbox_enable_strict_warnings target)
     if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -32,7 +33,7 @@ sandbox_enable_strict_warnings(sandbox)
 sandbox_add_compile_database(sandbox)
 target_compile_features(sandbox PUBLIC cxx_std_23)
 target_include_directories(sandbox PUBLIC library)
-target_link_libraries(sandbox PRIVATE yaml)
+target_link_libraries(sandbox PRIVATE yaml PUBLIC Threads::Threads)
 
 # ---- Modules ----
 option(BUILD_TESTING "Build tests" ON)

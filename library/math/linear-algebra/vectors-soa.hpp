@@ -40,7 +40,7 @@ namespace math
         VectorSoa &operator=(const VectorSoa &) = delete;
 
         VectorSoa(VectorSoa &&other) noexcept
-            : m_data(std::move(other.m_data)), m_capacity(std::exchange(other.m_capacity, 0)), m_size(std::exchange(other.m_size, 0)), m_handles(std::exchange(other.m_handles, HandleRegister{}))
+            : m_data(std::move(other.m_data)), m_capacity(std::exchange(other.m_capacity, 0)), m_size(std::exchange(other.m_size, 0)), m_handles(std::move(other.m_handles))
         {
         }
 

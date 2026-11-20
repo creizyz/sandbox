@@ -71,6 +71,23 @@ namespace math::tests
         expect_vector_near(rotate(vector, orientation), expected);
     }
 
+    TEST(Rotation, LargeCartesianVectorPreservesRepresentableComponents)
+    {
+        const auto maximum = std::numeric_limits<double>::max();
+        const auto tiny = std::numeric_limits<double>::denorm_min();
+        const Quaternion<double> half_turn{0, 0, 1, 0};
+        const Vector3d vector{maximum, tiny, tiny};
+        const auto result = rotate(vector, half_turn);
+        const auto matrix_result = rotation_matrix(half_turn) * vector;
+        EXPECT_EQ(result.x(), -maximum);
+        EXPECT_EQ(result.y(), -tiny);
+        EXPECT_EQ(result.z(), tiny);
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            EXPECT_EQ(result[i], matrix_result[i]);
+        }
+    }
+
     TEST(RigidPose, ConstructorsExposeTheStoredTranslationAndRotation)
     {
         constexpr Pose2<float> identity_2d;

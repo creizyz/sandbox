@@ -45,6 +45,19 @@ namespace math::tests
         EXPECT_THROW((void)(one / Amount{}), std::domain_error);
     }
 
+    TEST(FixedPoint, RoundsTheExactScaledFractionAtLargeScales)
+    {
+        using Precise = FixedPoint<(std::int64_t{1} << 62) - 1>;
+        constexpr auto nearest = 9 * (std::int64_t{1} << 58) - 1;
+        EXPECT_EQ(Precise::from_float(0.5625).raw(), nearest);
+        EXPECT_EQ(Precise::from_float(-0.5625).raw(), -nearest);
+        EXPECT_EQ(Precise::from_float(0.5f).raw(), std::int64_t{1} << 61);
+        EXPECT_EQ(Precise::from_float(0x1p-63L).raw(), 0);
+        EXPECT_EQ(Precise::from_float(0x1p-62L).raw(), 1);
+        EXPECT_EQ(FixedPoint<1>::from_float(-0x1p63L).raw(), std::numeric_limits<std::int64_t>::min());
+        EXPECT_THROW((void)FixedPoint<1>::from_float(0x1p63L), std::overflow_error);
+    }
+
     TEST(DiscreteTime, IntegratesRatesAndNetsFlowsBeforeAdjustingTheBalance)
     {
         using Amount = FixedPoint<>;
@@ -98,6 +111,11 @@ namespace math::tests
         EXPECT_DOUBLE_EQ(smooth_towards(5.0, 10.0, 0.0, 1.0), 5.0);
         EXPECT_GT(smooth_towards(0.0, 10.0, 1e-20, 1.0), 0.0);
         EXPECT_DOUBLE_EQ(smooth_towards(0.0, 10.0, 1e20, 1.0), 10.0);
+        const double remaining = 1e18 * std::exp(-40.0);
+        EXPECT_DOUBLE_EQ(smooth_towards(1e18, 0.0, 40.0, 1.0), remaining);
+        EXPECT_DOUBLE_EQ(smooth_towards(smooth_towards(1e18, 0.0, 20.0, 1.0), 0.0, 20.0, 1.0), remaining);
+        const double half_decay = std::exp(-375.0);
+        EXPECT_DOUBLE_EQ(smooth_towards(1e300, 0.0, 750.0, 1.0), (1e300 * half_decay) * half_decay);
         EXPECT_THROW((void)smooth_towards(0.0, 10.0, 1.0, 0.0), std::invalid_argument);
     }
 }

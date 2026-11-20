@@ -263,20 +263,10 @@ namespace math
             requires(!std::is_const_v<T> && std::is_convertible_v<U, T>)
         constexpr SelfReference divide(U scalar)
         {
-            if constexpr (std::is_floating_point_v<T>)
+            const auto divisor = static_cast<T>(scalar);
+            for (auto *component : m_data)
             {
-                const auto inv = static_cast<T>(1.0) / static_cast<T>(scalar);
-                for (std::size_t i = 0; i < N; ++i)
-                {
-                    *(m_data[i]) *= inv;
-                }
-            }
-            else
-            {
-                for (std::size_t i = 0; i < N; ++i)
-                {
-                    *(m_data[i]) /= static_cast<T>(scalar);
-                }
+                *component /= divisor;
             }
             return *this;
         }
@@ -339,9 +329,17 @@ namespace math
             requires(std::is_convertible_v<U, T>)
         [[nodiscard]] constexpr bool equals(const VectorView<N, U> &other) const noexcept
         {
+            using Common = std::common_type_t<T, U>;
             for (std::size_t i = 0; i < N; ++i)
             {
-                if (!((*this)[i] == static_cast<T>(other[i])))
+                if constexpr (std::is_integral_v<Common> && std::is_signed_v<T> != std::is_signed_v<U>)
+                {
+                    if (((*this)[i] < 0) != (other[i] < 0))
+                    {
+                        return false;
+                    }
+                }
+                if (static_cast<Common>((*this)[i]) != static_cast<Common>(other[i]))
                 {
                     return false;
                 }
@@ -350,10 +348,10 @@ namespace math
         }
 
         template <typename U>
-            requires(std::is_convertible_v<U, T> && std::floating_point<std::remove_const_t<T>>)
-        [[nodiscard]] constexpr bool near_equals(const VectorView<N, U> &other, std::remove_const_t<T> eps = epsilon_v<std::remove_const_t<T>>) const noexcept
+            requires std::floating_point<std::common_type_t<T, U>>
+        [[nodiscard]] constexpr bool near_equals(const VectorView<N, U> &other, std::common_type_t<T, U> eps = epsilon_v<std::common_type_t<T, U>>) const noexcept
         {
-            using BaseType = std::remove_const_t<T>;
+            using BaseType = std::common_type_t<T, U>;
             if (!(eps >= BaseType{0}))
             {
                 return false;
@@ -361,7 +359,7 @@ namespace math
             for (std::size_t i = 0; i < N; ++i)
             {
                 const auto a = static_cast<BaseType>((*this)[i]);
-                const auto b = static_cast<BaseType>(static_cast<T>(other[i]));
+                const auto b = static_cast<BaseType>(other[i]);
                 if (a != b && (!std::isfinite(a) || !std::isfinite(b) || !(std::abs(a - b) <= eps)))
                 {
                     return false;
@@ -374,7 +372,7 @@ namespace math
             requires std::is_convertible_v<U, T>
         [[nodiscard]] bool operator==(const VectorView<N, U> &other) const
         {
-            if constexpr (std::is_floating_point_v<T>)
+            if constexpr (std::floating_point<std::common_type_t<T, U>>)
             {
                 return this->near_equals(other);
             }
