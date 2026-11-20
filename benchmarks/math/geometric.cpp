@@ -1,9 +1,9 @@
 #include <benchmark/benchmark.h>
-#include "math/geometric.hpp"
+#include "math/geometry/vector-geometry.hpp"
 
 using namespace math;
 
-static void bm_vector2_cross(benchmark::State& state)
+static void bm_vector2_cross(benchmark::State &state)
 {
     static Vector2f inputs_a[] = {
         Vector2f{1.2f, 3.4f},
@@ -21,8 +21,8 @@ static void bm_vector2_cross(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        auto& a = inputs_a[i & 3u];
-        auto& b = inputs_b[i & 3u];
+        auto &a = inputs_a[i & 3u];
+        auto &b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -34,7 +34,7 @@ static void bm_vector2_cross(benchmark::State& state)
 }
 BENCHMARK(bm_vector2_cross);
 
-static void bm_vector3_cross(benchmark::State& state)
+static void bm_vector3_cross(benchmark::State &state)
 {
     static Vector3f inputs_a[] = {
         Vector3f{1.2f, 3.4f, 5.6f},
@@ -52,8 +52,8 @@ static void bm_vector3_cross(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        auto& a = inputs_a[i & 3u];
-        auto& b = inputs_b[i & 3u];
+        auto &a = inputs_a[i & 3u];
+        auto &b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -65,7 +65,7 @@ static void bm_vector3_cross(benchmark::State& state)
 }
 BENCHMARK(bm_vector3_cross);
 
-static void bm_vector3_rotate(benchmark::State& state)
+static void bm_vector3_rotate(benchmark::State &state)
 {
     static Vector3f inputs_a[] = {
         Vector3f{1.2f, 3.4f, 5.6f},
@@ -74,17 +74,17 @@ static void bm_vector3_rotate(benchmark::State& state)
         Vector3f{4.2f, 6.4f, 8.6f},
     };
     static Quaternion<float> inputs_b[] = {
-        Quaternion<float>{ 1.0f, 0.0f, 0.0f, 0.0f },
-        Quaternion<float>{ 0.70710678f, 0.70710678f, 0.0f, 0.0f },
-        Quaternion<float>{ 0.86602540f, 0.0f, 0.5f, 0.0f },
-        Quaternion<float>{ 0.5f, 0.5f, 0.5f, 0.5f },
+        Quaternion<float>{1.0f, 0.0f, 0.0f, 0.0f},
+        Quaternion<float>{0.70710678f, 0.70710678f, 0.0f, 0.0f},
+        Quaternion<float>{0.86602540f, 0.0f, 0.5f, 0.0f},
+        Quaternion<float>{0.5f, 0.5f, 0.5f, 0.5f},
     };
 
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        auto& a = inputs_a[i & 3u];
-        auto& b = inputs_b[i & 3u];
+        auto &a = inputs_a[i & 3u];
+        auto &b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 

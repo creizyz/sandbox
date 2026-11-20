@@ -4,8 +4,8 @@
 #include <cmath>
 #include <limits>
 
-#include "math/geometric.hpp"
-#include "math/interpolation.hpp"
+#include "math/geometry/vector-geometry.hpp"
+#include "math/numerics/interpolation.hpp"
 
 namespace math::tests
 {

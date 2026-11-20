@@ -3,8 +3,8 @@
 #include <cmath>
 #include <concepts>
 
-#include "matrix.hpp"
-#include "vectors.hpp"
+#include "math/linear-algebra/matrix.hpp"
+#include "math/linear-algebra/vectors.hpp"
 #include "quaternion.hpp"
 
 namespace math

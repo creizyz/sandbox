@@ -5,8 +5,8 @@
 #include <concepts>
 #include <cstddef>
 
-#include "detail/norm.hpp"
-#include "vectors.hpp"
+#include "math/detail/norm.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 namespace math
 {

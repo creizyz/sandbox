@@ -5,30 +5,32 @@
 #include <string>
 #include <type_traits>
 
-#include "math/vectors.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 using namespace math;
 
 template <std::size_t N, typename T>
-void expect_vec_eq_exact(const Vector<N, T>& a, const Vector<N, T>& b)
+void expect_vec_eq_exact(const Vector<N, T> &a, const Vector<N, T> &b)
 {
-  for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < N; ++i)
     {
-    EXPECT_EQ(a[static_cast<int>(i)], b[static_cast<int>(i)]) << "i=" << i;
-  }
+        EXPECT_EQ(a[static_cast<int>(i)], b[static_cast<int>(i)]) << "i=" << i;
+    }
 }
 
 template <std::size_t N, typename T>
-void expect_vec_near(const Vector<N, T>& a, const Vector<N, T>& b, T tol)
+void expect_vec_near(const Vector<N, T> &a, const Vector<N, T> &b, T tol)
 {
-  for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < N; ++i)
     {
-    EXPECT_NEAR(a[static_cast<int>(i)], b[static_cast<int>(i)], tol) << "i=" << i;
-  }
+        EXPECT_NEAR(a[static_cast<int>(i)], b[static_cast<int>(i)], tol) << "i=" << i;
+    }
 }
 
 template <typename T>
-struct VecTypedTest : ::testing::Test {};
+struct VecTypedTest : ::testing::Test
+{
+};
 
 using FloatTypes = ::testing::Types<float, double>;
 TYPED_TEST_SUITE(VecTypedTest, FloatTypes);
@@ -49,273 +51,278 @@ static_assert(!std::is_constructible_v<Vector2<float>, std::string, int>);
 
 TEST(VectorStorageAliasing, Vector2_XYAliasesData)
 {
-  Vector2f v;
-  v.x() = 1.25f;
-  v.y() = -2.0f;
+    Vector2f v;
+    v.x() = 1.25f;
+    v.y() = -2.0f;
 
-  EXPECT_FLOAT_EQ(v[0], 1.25f);
-  EXPECT_FLOAT_EQ(v[1], -2.0f);
+    EXPECT_FLOAT_EQ(v[0], 1.25f);
+    EXPECT_FLOAT_EQ(v[1], -2.0f);
 
-  v[0] = 3.5f;
-  v[1] = 4.5f;
+    v[0] = 3.5f;
+    v[1] = 4.5f;
 
-  EXPECT_FLOAT_EQ(v.x(), 3.5f);
-  EXPECT_FLOAT_EQ(v.y(), 4.5f);
+    EXPECT_FLOAT_EQ(v.x(), 3.5f);
+    EXPECT_FLOAT_EQ(v.y(), 4.5f);
 }
 
 TEST(VectorStorageAliasing, Vector3_XYZAndRGBAliasesData)
 {
-  Vector3f v;
-  v.x() = 1.0f; v.y() = 2.0f; v.z() = 3.0f;
+    Vector3f v;
+    v.x() = 1.0f;
+    v.y() = 2.0f;
+    v.z() = 3.0f;
 
-  EXPECT_FLOAT_EQ(v[0], 1.0f);
-  EXPECT_FLOAT_EQ(v[1], 2.0f);
-  EXPECT_FLOAT_EQ(v[2], 3.0f);
+    EXPECT_FLOAT_EQ(v[0], 1.0f);
+    EXPECT_FLOAT_EQ(v[1], 2.0f);
+    EXPECT_FLOAT_EQ(v[2], 3.0f);
 }
 
 TEST(VectorStorageAliasing, Vector4_XYZWAndRGBAAliasesData)
 {
-  Vector4f v;
-  v.x() = 1.0f; v.y() = 2.0f; v.z() = 3.0f; v.w() = 4.0f;
+    Vector4f v;
+    v.x() = 1.0f;
+    v.y() = 2.0f;
+    v.z() = 3.0f;
+    v.w() = 4.0f;
 
-  EXPECT_FLOAT_EQ(v[0], 1.0f);
-  EXPECT_FLOAT_EQ(v[1], 2.0f);
-  EXPECT_FLOAT_EQ(v[2], 3.0f);
-  EXPECT_FLOAT_EQ(v[3], 4.0f);
+    EXPECT_FLOAT_EQ(v[0], 1.0f);
+    EXPECT_FLOAT_EQ(v[1], 2.0f);
+    EXPECT_FLOAT_EQ(v[2], 3.0f);
+    EXPECT_FLOAT_EQ(v[3], 4.0f);
 }
 
 // --- Construction / cast / fill / constants ---
 
 TYPED_TEST(VecTypedTest, FillAndConstants_WorkForAllComponents)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const auto z2 = Vector2<T>::zero;
-  const auto o2 = Vector2<T>::one;
-  expect_vec_eq_exact(z2, Vector2<T>(T{0}, T{0}));
-  expect_vec_eq_exact(o2, Vector2<T>(T{1}, T{1}));
+    const auto z2 = Vector2<T>::zero;
+    const auto o2 = Vector2<T>::one;
+    expect_vec_eq_exact(z2, Vector2<T>(T{0}, T{0}));
+    expect_vec_eq_exact(o2, Vector2<T>(T{1}, T{1}));
 
-  const auto f3 = Vector3<T>::fill(T{5});
-  expect_vec_eq_exact(f3, Vector3<T>(T{5}, T{5}, T{5}));
+    const auto f3 = Vector3<T>::fill(T{5});
+    expect_vec_eq_exact(f3, Vector3<T>(T{5}, T{5}, T{5}));
 }
 
 TYPED_TEST(VecTypedTest, Cast_ConvertsEachComponent)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<int> vi(1, -2, 3);
-  const auto vt = static_cast<Vector3<T>>( vi);
-  expect_vec_eq_exact(vt, Vector3<T>(T{1}, T{-2}, T{3}));
+    const Vector3<int> vi(1, -2, 3);
+    const auto vt = static_cast<Vector3<T>>(vi);
+    expect_vec_eq_exact(vt, Vector3<T>(T{1}, T{-2}, T{3}));
 
-  // Explicit converting ctor should behave like cast()
-  const Vector3<T> vt2(vi);
-  expect_vec_eq_exact(vt2, vt);
+    // Explicit converting ctor should behave like cast()
+    const Vector3<T> vt2(vi);
+    expect_vec_eq_exact(vt2, vt);
 }
 
 // --- apply / transform / all / any / clamp ---
 
 TYPED_TEST(VecTypedTest, Apply_MapsEachComponent)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> v(T{1}, T{-2}, T{3});
-  const auto abs_v = v.transform([](T x)
-    { return std::abs(x); });
+    const Vector3<T> v(T{1}, T{-2}, T{3});
+    const auto abs_v = v.transform([](T x)
+                                   { return std::abs(x); });
 
-  expect_vec_eq_exact(abs_v, Vector3<T>(T{1}, T{2}, T{3}));
+    expect_vec_eq_exact(abs_v, Vector3<T>(T{1}, T{2}, T{3}));
 }
 
 TYPED_TEST(VecTypedTest, Transform_CombinesPairwise)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector4<T> a(T{1}, T{2}, T{3}, T{4});
-  const Vector4<T> b(T{10}, T{20}, T{30}, T{40});
+    const Vector4<T> a(T{1}, T{2}, T{3}, T{4});
+    const Vector4<T> b(T{10}, T{20}, T{30}, T{40});
 
-  const auto c = a.transform(b, [](T x, T y)
-    { return x + T{2} * y; });
-  expect_vec_eq_exact(c, Vector4<T>(T{21}, T{42}, T{63}, T{84}));
+    const auto c = a.transform(b, [](T x, T y)
+                               { return x + T{2} * y; });
+    expect_vec_eq_exact(c, Vector4<T>(T{21}, T{42}, T{63}, T{84}));
 }
 
 TYPED_TEST(VecTypedTest, AllAny_UnaryPredicate)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> v(T{1}, T{2}, T{3});
-  EXPECT_TRUE(v.all([](T x)
-    { return x > T{0}; }));
-  EXPECT_TRUE(v.any([](T x)
-    { return x == T{2}; }));
-  EXPECT_FALSE(v.all([](T x)
-    { return x == T{2}; }));
-  EXPECT_FALSE(v.any([](T x)
-    { return x < T{0}; }));
+    const Vector3<T> v(T{1}, T{2}, T{3});
+    EXPECT_TRUE(v.all([](T x)
+                      { return x > T{0}; }));
+    EXPECT_TRUE(v.any([](T x)
+                      { return x == T{2}; }));
+    EXPECT_FALSE(v.all([](T x)
+                       { return x == T{2}; }));
+    EXPECT_FALSE(v.any([](T x)
+                       { return x < T{0}; }));
 }
 
 TYPED_TEST(VecTypedTest, AllAny_BinaryPredicateAgainstOther)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> a(T{1}, T{2}, T{3});
-  const Vector3<T> b(T{1}, T{0}, T{3});
+    const Vector3<T> a(T{1}, T{2}, T{3});
+    const Vector3<T> b(T{1}, T{0}, T{3});
 
-  EXPECT_TRUE(a.any(b, [](T x, T y)
-    { return x == y; }));
-  EXPECT_FALSE(a.all(b, [](T x, T y)
-    { return x == y; }));
+    EXPECT_TRUE(a.any(b, [](T x, T y)
+                      { return x == y; }));
+    EXPECT_FALSE(a.all(b, [](T x, T y)
+                       { return x == y; }));
 }
 
 TYPED_TEST(VecTypedTest, Clamp_ClampsEachComponent)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector4<T> v(T{-10}, T{-1}, T{3}, T{100});
-  const auto c = v.clamp(T{-2}, T{5});
+    const Vector4<T> v(T{-10}, T{-1}, T{3}, T{100});
+    const auto c = v.clamp(T{-2}, T{5});
 
-  expect_vec_eq_exact(c, Vector4<T>(T{-2}, T{-1}, T{3}, T{5}));
+    expect_vec_eq_exact(c, Vector4<T>(T{-2}, T{-1}, T{3}, T{5}));
 }
 
 // --- arithmetic operators (vector/vector and vector/scalar) ---
 
 TYPED_TEST(VecTypedTest, VectorAddSub_WorksComponentwise)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> a(T{1}, T{2}, T{3});
-  const Vector3<T> b(T{10}, T{20}, T{30});
+    const Vector3<T> a(T{1}, T{2}, T{3});
+    const Vector3<T> b(T{10}, T{20}, T{30});
 
-  expect_vec_eq_exact(a + b, Vector3<T>(T{11}, T{22}, T{33}));
-  expect_vec_eq_exact(b - a, Vector3<T>(T{9}, T{18}, T{27}));
+    expect_vec_eq_exact(a + b, Vector3<T>(T{11}, T{22}, T{33}));
+    expect_vec_eq_exact(b - a, Vector3<T>(T{9}, T{18}, T{27}));
 }
 
 TYPED_TEST(VecTypedTest, ScalarMulDiv_WorksAndLeftScalarMulWorks)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector2<T> v(T{3}, T{-4});
+    const Vector2<T> v(T{3}, T{-4});
 
-  expect_vec_eq_exact(v * T{2}, Vector2<T>(T{6}, T{-8}));
-  expect_vec_eq_exact(T{2} * v, Vector2<T>(T{6}, T{-8}));
+    expect_vec_eq_exact(v * T{2}, Vector2<T>(T{6}, T{-8}));
+    expect_vec_eq_exact(T{2} * v, Vector2<T>(T{6}, T{-8}));
 
-  const auto half = v / T{2};
-  expect_vec_near(half, Vector2<T>(T{1.5}, T{-2.0}), epsilon_v<T> * T{8});
+    const auto half = v / T{2};
+    expect_vec_near(half, Vector2<T>(T{1.5}, T{-2.0}), epsilon_v<T> * T{8});
 }
 
 TYPED_TEST(VecTypedTest, CompoundAssignment_MatchesNonCompound)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  Vector3<T> a(T{1}, T{2}, T{3});
-  const Vector3<T> b(T{5}, T{6}, T{7});
+    Vector3<T> a(T{1}, T{2}, T{3});
+    const Vector3<T> b(T{5}, T{6}, T{7});
 
-  auto expected = a + b;
-  a += b;
-  expect_vec_eq_exact(a, expected);
+    auto expected = a + b;
+    a += b;
+    expect_vec_eq_exact(a, expected);
 
-  a = Vector3<T>(T{1}, T{2}, T{3});
-  expected = a - b;
-  a -= b;
-  expect_vec_eq_exact(a, expected);
+    a = Vector3<T>(T{1}, T{2}, T{3});
+    expected = a - b;
+    a -= b;
+    expect_vec_eq_exact(a, expected);
 
-  a = Vector3<T>(T{1}, T{2}, T{3});
-  expected = a * T{3};
-  a *= T{3};
-  expect_vec_eq_exact(a, expected);
+    a = Vector3<T>(T{1}, T{2}, T{3});
+    expected = a * T{3};
+    a *= T{3};
+    expect_vec_eq_exact(a, expected);
 }
 
 TYPED_TEST(VecTypedTest, UnaryMinus_NegatesEachComponent)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector4<T> v(T{1}, T{-2}, T{3}, T{-4});
-  expect_vec_eq_exact(-v, Vector4<T>(T{-1}, T{2}, T{-3}, T{4}));
+    const Vector4<T> v(T{1}, T{-2}, T{3}, T{-4});
+    expect_vec_eq_exact(-v, Vector4<T>(T{-1}, T{2}, T{-3}, T{4}));
 }
 
 // --- dot / length / normalize ---
 
 TYPED_TEST(VecTypedTest, DotProduct_Correct)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> a(T{1}, T{2}, T{3});
-  const Vector3<T> b(T{4}, T{5}, T{6});
+    const Vector3<T> a(T{1}, T{2}, T{3});
+    const Vector3<T> b(T{4}, T{5}, T{6});
 
-  EXPECT_NEAR(a.dot(b), T{32}, epsilon_v<T> * T{16}); // 1*4 + 2*5 + 3*6 = 32
+    EXPECT_NEAR(a.dot(b), T{32}, epsilon_v<T> * T{16}); // 1*4 + 2*5 + 3*6 = 32
 }
 
 TYPED_TEST(VecTypedTest, SquaredLengthAndLength_Correct)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector2<T> v(T{3}, T{4});
-  EXPECT_NEAR(v.squared_length(), T{25}, epsilon_v<T> * T{16});
-  EXPECT_NEAR(v.length(), T{5}, epsilon_v<T> * T{32});
+    const Vector2<T> v(T{3}, T{4});
+    EXPECT_NEAR(v.squared_length(), T{25}, epsilon_v<T> * T{16});
+    EXPECT_NEAR(v.length(), T{5}, epsilon_v<T> * T{32});
 }
 
 TYPED_TEST(VecTypedTest, Normalized_HasUnitLengthAndSameDirection)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> v(T{2}, T{0}, T{0});
-  const auto n = v.normalized();
+    const Vector3<T> v(T{2}, T{0}, T{0});
+    const auto n = v.normalized();
 
-  expect_vec_near(n, Vector3<T>(T{1}, T{0}, T{0}), epsilon_v<T> * T{32});
-  EXPECT_NEAR(n.length(), T{1}, epsilon_v<T> * T{64});
+    expect_vec_near(n, Vector3<T>(T{1}, T{0}, T{0}), epsilon_v<T> * T{32});
+    EXPECT_NEAR(n.length(), T{1}, epsilon_v<T> * T{64});
 }
 
 TYPED_TEST(VecTypedTest, Normalize_InPlace_ScalesIfNonZero)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  Vector2<T> v(T{3}, T{4});
-  v.normalize();
+    Vector2<T> v(T{3}, T{4});
+    v.normalize();
 
-  EXPECT_NEAR(v.length(), T{1}, epsilon_v<T> * T{64});
-  // Direction checks (ratio preserved): v should be (0.6, 0.8)
-  expect_vec_near(v, Vector2<T>(T{0.6}, T{0.8}), epsilon_v<T> * T{256});
+    EXPECT_NEAR(v.length(), T{1}, epsilon_v<T> * T{64});
+    // Direction checks (ratio preserved): v should be (0.6, 0.8)
+    expect_vec_near(v, Vector2<T>(T{0.6}, T{0.8}), epsilon_v<T> * T{256});
 }
 
 TYPED_TEST(VecTypedTest, Normalize_DoesNothingForNearZeroVector)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  // Intentionally tiny values: length <= epsilon => should not modify.
-  const T tiny = epsilon_v<T> * T{0.25};
-  Vector3<T> v(tiny, -tiny, tiny);
-  const auto before = v;
+    // Intentionally tiny values: length <= epsilon => should not modify.
+    const T tiny = epsilon_v<T> * T{0.25};
+    Vector3<T> v(tiny, -tiny, tiny);
+    const auto before = v;
 
-  v.normalize();
-  expect_vec_eq_exact(v, before);
+    v.normalize();
+    expect_vec_eq_exact(v, before);
 }
 
 // --- equality (epsilon-based) ---
 
 TYPED_TEST(VecTypedTest, Equality_UsesEpsilonPerComponent)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const Vector3<T> a(T{1}, T{2}, T{3});
-  const Vector3<T> b(T{1} + epsilon_v<T> * T{0.5}, T{2}, T{3});
-  const Vector3<T> c(T{1} + epsilon_v<T> * T{2.0}, T{2}, T{3});
+    const Vector3<T> a(T{1}, T{2}, T{3});
+    const Vector3<T> b(T{1} + epsilon_v<T> * T{0.5}, T{2}, T{3});
+    const Vector3<T> c(T{1} + epsilon_v<T> * T{2.0}, T{2}, T{3});
 
-  EXPECT_TRUE(a == b);
-  EXPECT_FALSE(a == c);
+    EXPECT_TRUE(a == b);
+    EXPECT_FALSE(a == c);
 }
 
 // --- operator[] ---
 
 TYPED_TEST(VecTypedTest, IndexOperator_ReadWrite)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  Vector4<T> v(T{0}, T{0}, T{0}, T{0});
-  v[0] = T{1};
-  v[1] = T{2};
-  v[2] = T{3};
-  v[3] = T{4};
+    Vector4<T> v(T{0}, T{0}, T{0}, T{0});
+    v[0] = T{1};
+    v[1] = T{2};
+    v[2] = T{3};
+    v[3] = T{4};
 
-  EXPECT_EQ(v[0], T{1});
-  EXPECT_EQ(v[1], T{2});
-  EXPECT_EQ(v[2], T{3});
-  EXPECT_EQ(v[3], T{4});
+    EXPECT_EQ(v[0], T{1});
+    EXPECT_EQ(v[1], T{2});
+    EXPECT_EQ(v[2], T{3});
+    EXPECT_EQ(v[3], T{4});
 }

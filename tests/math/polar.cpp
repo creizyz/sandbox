@@ -4,8 +4,8 @@
 #include <cmath>
 #include <numbers>
 
-#include "math/interpolation.hpp"
-#include "math/polar.hpp"
+#include "math/numerics/interpolation.hpp"
+#include "math/geometry/polar.hpp"
 
 namespace math::tests
 {

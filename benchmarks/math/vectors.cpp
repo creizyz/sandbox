@@ -1,9 +1,9 @@
 #include <benchmark/benchmark.h>
-#include "math/vectors.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 using namespace math;
 
-static void bm_vector3_creation(benchmark::State& state)
+static void bm_vector3_creation(benchmark::State &state)
 {
     std::uint32_t i = 0;
     for (auto _ : state)
@@ -26,7 +26,7 @@ static void bm_vector3_creation(benchmark::State& state)
 BENCHMARK(bm_vector3_creation);
 
 template <size_t N>
-static void bm_vector_creation(benchmark::State& state)
+static void bm_vector_creation(benchmark::State &state)
 {
     std::uint32_t i = 0;
     for (auto _ : state)
@@ -45,7 +45,7 @@ BENCHMARK(bm_vector_creation<3>);
 BENCHMARK(bm_vector_creation<4>);
 BENCHMARK(bm_vector_creation<16>);
 
-static void bm_vector3_addition(benchmark::State& state)
+static void bm_vector3_addition(benchmark::State &state)
 {
     static Vector3f inputs_a[] = {
         Vector3f{1.2f, 3.4f, 5.6f},
@@ -63,8 +63,8 @@ static void bm_vector3_addition(benchmark::State& state)
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        auto& a = inputs_a[i & 3u];
-        auto& b = inputs_b[i & 3u];
+        auto &a = inputs_a[i & 3u];
+        auto &b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -76,26 +76,24 @@ static void bm_vector3_addition(benchmark::State& state)
 }
 BENCHMARK(bm_vector3_addition);
 
-static void bm_vector3_dot_product(benchmark::State& state)
+static void bm_vector3_dot_product(benchmark::State &state)
 {
     static Vector3f inputs_a[] = {
         Vector3f{1.2f, 3.4f, 5.6f},
         Vector3f{2.2f, 4.4f, 6.6f},
         Vector3f{3.2f, 5.4f, 7.6f},
-        Vector3f{4.2f, 6.4f, 8.6f}
-    };
+        Vector3f{4.2f, 6.4f, 8.6f}};
     static Vector3f inputs_b[] = {
         Vector3f{7.8f, 9.0f, 1.2f},
         Vector3f{8.8f, 1.0f, 2.2f},
         Vector3f{9.8f, 2.0f, 3.2f},
-        Vector3f{1.8f, 3.0f, 4.2f}
-    };
+        Vector3f{1.8f, 3.0f, 4.2f}};
 
     std::uint32_t i = 0;
     for (auto _ : state)
     {
-        auto& a = inputs_a[i & 3u];
-        auto& b = inputs_b[i & 3u];
+        auto &a = inputs_a[i & 3u];
+        auto &b = inputs_b[i & 3u];
         benchmark::DoNotOptimize(a);
         benchmark::DoNotOptimize(b);
 
@@ -108,7 +106,7 @@ static void bm_vector3_dot_product(benchmark::State& state)
 BENCHMARK(bm_vector3_dot_product);
 
 template <size_t N>
-static void bm_vector_squared_length(benchmark::State& state)
+static void bm_vector_squared_length(benchmark::State &state)
 {
     Vector<N, float> v = Vector<N, float>::one;
 

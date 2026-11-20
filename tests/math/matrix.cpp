@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "math/matrix.hpp"
+#include "math/linear-algebra/matrix.hpp"
 
 namespace math::tests
 {

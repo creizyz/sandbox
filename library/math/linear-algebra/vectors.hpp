@@ -8,8 +8,8 @@
 #include <utility>
 #include <functional>
 
-#include "constants.hpp"
-#include "detail/norm.hpp"
+#include "math/constants.hpp"
+#include "math/detail/norm.hpp"
 
 namespace math
 {

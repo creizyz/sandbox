@@ -2,7 +2,7 @@
 
 ## Vector storage and handles
 
-[`VectorSoa<N, T>`](../vectors-soa.hpp) keeps each component in a separate contiguous array.
+[`VectorSoa<N, T>`](../linear-algebra/vectors-soa.hpp) keeps each component in a separate contiguous array.
 `emplace()` appends a row and returns its handle. `resize()` appends zero-filled rows or removes
 rows from the end. `handle_at()` retrieves a row handle by index, and `get()` resolves a handle to
 an optional view. Handles belong to the container that issued them and transfer with its storage
@@ -18,11 +18,11 @@ the container when a caller needs to keep referring to the same row.
 
 ## Arithmetic
 
-[`Matrix`](../matrix.hpp) uses column indexing. Scalar division divides each element and requires
+[`Matrix`](../linear-algebra/matrix.hpp) uses column indexing. Scalar division divides each element and requires
 a nonzero divisor after conversion to the element type. Integer division truncates toward zero
 as in C++.
 
-[`Vector`](../vectors.hpp) and [`VectorView`](../vectors-view.hpp) scale components before taking
+[`Vector`](../linear-algebra/vectors.hpp) and [`VectorView`](../linear-algebra/vectors-view.hpp) scale components before taking
 the Euclidean norm. In-place normalization leaves near-zero and non-finite inputs alone.
 `Vector::normalized()` returns a zero vector for those inputs. `VectorView::near_equals()` rejects
 NaN components and treats matching infinities as equal.
@@ -34,7 +34,7 @@ See [rigid motion](02-rigid-motion.md) for Cartesian rotations, poses, and angul
 
 ## Polar coordinates
 
-[`Polar2<T>`](../polar.hpp) stores a nonnegative radius and an angle in `[-π, π)`.
+[`Polar2<T>`](../geometry/polar.hpp) stores a nonnegative radius and an angle in `[-π, π)`.
 Angles are counterclockwise radians from positive X. A negative input radius is converted by
 adding a half-turn. The origin has radius and angle zero. Use `from_cartesian()` and
 `to_cartesian()` to convert between polar coordinates and `Vector2<T>`. `rotated()` adds
@@ -43,7 +43,7 @@ be representable in the chosen scalar type.
 
 ## Interpolation
 
-The functions in [interpolation.hpp](../interpolation.hpp) clamp finite interpolation parameters
+The functions in [interpolation.hpp](../numerics/interpolation.hpp) clamp finite interpolation parameters
 to `[0, 1]`. Scalar and vector overloads expect matching floating-point types for new methods.
 
 | Function | Contract |

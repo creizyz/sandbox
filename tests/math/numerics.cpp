@@ -4,8 +4,8 @@
 #include <limits>
 #include <type_traits>
 
-#include "math/geometric.hpp"
-#include "math/vectors-view.hpp"
+#include "math/geometry/vector-geometry.hpp"
+#include "math/linear-algebra/vectors-view.hpp"
 
 namespace math::tests
 {

@@ -5,7 +5,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "math/vectors-soa.hpp"
+#include "math/linear-algebra/vectors-soa.hpp"
 
 namespace math::tests
 {

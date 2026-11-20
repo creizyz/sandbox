@@ -2,29 +2,31 @@
 
 #include <cmath>
 
-#include "math/vectors.hpp"
-#include "math/quaternion.hpp"
+#include "math/linear-algebra/vectors.hpp"
+#include "math/geometry/quaternion.hpp"
 
 template <typename T>
-void expect_quat_near(const math::Quaternion<T>& a, const math::Quaternion<T>& b, T tol)
+void expect_quat_near(const math::Quaternion<T> &a, const math::Quaternion<T> &b, T tol)
 {
-  EXPECT_NEAR(a.x(), b.x(), tol);
-  EXPECT_NEAR(a.y(), b.y(), tol);
-  EXPECT_NEAR(a.z(), b.z(), tol);
-  EXPECT_NEAR(a.w(), b.w(), tol);
+    EXPECT_NEAR(a.x(), b.x(), tol);
+    EXPECT_NEAR(a.y(), b.y(), tol);
+    EXPECT_NEAR(a.z(), b.z(), tol);
+    EXPECT_NEAR(a.w(), b.w(), tol);
 }
 
 template <typename T>
-void expect_quat_eq_exact(const math::Quaternion<T>& a, const math::Quaternion<T>& b)
+void expect_quat_eq_exact(const math::Quaternion<T> &a, const math::Quaternion<T> &b)
 {
-  EXPECT_EQ(a.x(), b.x());
-  EXPECT_EQ(a.y(), b.y());
-  EXPECT_EQ(a.z(), b.z());
-  EXPECT_EQ(a.w(), b.w());
+    EXPECT_EQ(a.x(), b.x());
+    EXPECT_EQ(a.y(), b.y());
+    EXPECT_EQ(a.z(), b.z());
+    EXPECT_EQ(a.w(), b.w());
 }
 
 template <typename T>
-struct QuatTypedTest : ::testing::Test {};
+struct QuatTypedTest : ::testing::Test
+{
+};
 
 using FloatTypes = ::testing::Types<float, double>;
 TYPED_TEST_SUITE(QuatTypedTest, FloatTypes);
@@ -33,230 +35,230 @@ TYPED_TEST_SUITE(QuatTypedTest, FloatTypes);
 template <typename T>
 constexpr T test_tolerance()
 {
-  return math::epsilon_v<T> * T{256};
+    return math::epsilon_v<T> * T{256};
 }
 
 // --- Construction / accessors / basic invariants ---
 
 TYPED_TEST(QuatTypedTest, DefaultConstructor_IsIdentityLike)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q;
-  expect_quat_eq_exact(q, math::Quaternion<T>(T{0}, T{0}, T{0}, T{1}));
+    const math::Quaternion<T> q;
+    expect_quat_eq_exact(q, math::Quaternion<T>(T{0}, T{0}, T{0}, T{1}));
 
-  // Length of identity quaternion should be 1.
-  EXPECT_NEAR(q.length(), T{1}, test_tolerance<T>());
-  EXPECT_NEAR(q.squared_length(), T{1}, test_tolerance<T>());
+    // Length of identity quaternion should be 1.
+    EXPECT_NEAR(q.length(), T{1}, test_tolerance<T>());
+    EXPECT_NEAR(q.squared_length(), T{1}, test_tolerance<T>());
 }
 
 TYPED_TEST(QuatTypedTest, ComponentConstructor_AndAccessors)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
-  EXPECT_EQ(q.x(), T{1});
-  EXPECT_EQ(q.y(), T{2});
-  EXPECT_EQ(q.z(), T{3});
-  EXPECT_EQ(q.w(), T{4});
+    const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    EXPECT_EQ(q.x(), T{1});
+    EXPECT_EQ(q.y(), T{2});
+    EXPECT_EQ(q.z(), T{3});
+    EXPECT_EQ(q.w(), T{4});
 }
 
 TYPED_TEST(QuatTypedTest, VectorConstructor_PreservesComponents)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Vector4<T> v(T{1}, T{-2}, T{3}, T{-4});
-  const math::Quaternion<T> q(v);
+    const math::Vector4<T> v(T{1}, T{-2}, T{3}, T{-4});
+    const math::Quaternion<T> q(v);
 
-  EXPECT_EQ(q.x(), T{1});
-  EXPECT_EQ(q.y(), T{-2});
-  EXPECT_EQ(q.z(), T{3});
-  EXPECT_EQ(q.w(), T{-4});
+    EXPECT_EQ(q.x(), T{1});
+    EXPECT_EQ(q.y(), T{-2});
+    EXPECT_EQ(q.z(), T{3});
+    EXPECT_EQ(q.w(), T{-4});
 }
 
 // --- length / normalization semantics ---
 
 TYPED_TEST(QuatTypedTest, LengthAndSquaredLength_MatchExpectedForSimpleCase)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{3}, T{4}, T{0}, T{0});
-  EXPECT_NEAR(q.squared_length(), T{25}, test_tolerance<T>());
-  EXPECT_NEAR(q.length(), T{5}, test_tolerance<T>());
+    const math::Quaternion<T> q(T{3}, T{4}, T{0}, T{0});
+    EXPECT_NEAR(q.squared_length(), T{25}, test_tolerance<T>());
+    EXPECT_NEAR(q.length(), T{5}, test_tolerance<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Normalized_ReturnsUnitQuaternion_ForNonZero)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{0}, T{0}, T{0}, T{2});
-  const auto n = q.normalized();
+    const math::Quaternion<T> q(T{0}, T{0}, T{0}, T{2});
+    const auto n = q.normalized();
 
-  expect_quat_near(n, math::Quaternion<T>(T{0}, T{0}, T{0}, T{1}), test_tolerance<T>());
-  EXPECT_NEAR(n.length(), T{1}, test_tolerance<T>());
-  EXPECT_NEAR(n.squared_length(), T{1}, test_tolerance<T>());
+    expect_quat_near(n, math::Quaternion<T>(T{0}, T{0}, T{0}, T{1}), test_tolerance<T>());
+    EXPECT_NEAR(n.length(), T{1}, test_tolerance<T>());
+    EXPECT_NEAR(n.squared_length(), T{1}, test_tolerance<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Normalize_InPlace_MakesUnitQuaternion_ForNonZero)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
-  const auto before_len = q.length();
-  ASSERT_GT(before_len, T{0});
+    math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    const auto before_len = q.length();
+    ASSERT_GT(before_len, T{0});
 
-  q.normalize();
+    q.normalize();
 
-  EXPECT_NEAR(q.length(), T{1}, test_tolerance<T>());
-  EXPECT_NEAR(q.squared_length(), T{1}, test_tolerance<T>());
+    EXPECT_NEAR(q.length(), T{1}, test_tolerance<T>());
+    EXPECT_NEAR(q.squared_length(), T{1}, test_tolerance<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Normalize_DoesNotExplodeForNearZero)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  // This relies on Vector::normalize() behavior: it should avoid division for tiny length.
-  const T tiny = math::epsilon_v<T> * T{0.25};
-  math::Quaternion<T> q(tiny, -tiny, tiny, -tiny);
-  const auto before = q;
+    // This relies on Vector::normalize() behavior: it should avoid division for tiny length.
+    const T tiny = math::epsilon_v<T> * T{0.25};
+    math::Quaternion<T> q(tiny, -tiny, tiny, -tiny);
+    const auto before = q;
 
-  q.normalize();
+    q.normalize();
 
-  // Should remain unchanged (or at least finite and very close).
-  expect_quat_near(q, before, T{0});
-  EXPECT_TRUE(std::isfinite(q.x()));
-  EXPECT_TRUE(std::isfinite(q.y()));
-  EXPECT_TRUE(std::isfinite(q.z()));
-  EXPECT_TRUE(std::isfinite(q.w()));
+    // Should remain unchanged (or at least finite and very close).
+    expect_quat_near(q, before, T{0});
+    EXPECT_TRUE(std::isfinite(q.x()));
+    EXPECT_TRUE(std::isfinite(q.y()));
+    EXPECT_TRUE(std::isfinite(q.z()));
+    EXPECT_TRUE(std::isfinite(q.w()));
 }
 
 // --- conjugate properties ---
 
 TYPED_TEST(QuatTypedTest, Conjugate_NegatesVectorPart_LeavesScalarPart)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{1}, T{-2}, T{3}, T{-4});
-  const auto c = q.conjugate();
+    const math::Quaternion<T> q(T{1}, T{-2}, T{3}, T{-4});
+    const auto c = q.conjugate();
 
-  expect_quat_eq_exact(c, math::Quaternion<T>(T{-1}, T{2}, T{-3}, T{-4}));
+    expect_quat_eq_exact(c, math::Quaternion<T>(T{-1}, T{2}, T{-3}, T{-4}));
 }
 
 TYPED_TEST(QuatTypedTest, ConjugateOfConjugate_ReturnsOriginal)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
-  const auto cc = q.conjugate().conjugate();
+    const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    const auto cc = q.conjugate().conjugate();
 
-  expect_quat_eq_exact(cc, q);
+    expect_quat_eq_exact(cc, q);
 }
 
 TYPED_TEST(QuatTypedTest, Conjugate_PreservesLength)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
-  const auto c = q.conjugate();
+    const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    const auto c = q.conjugate();
 
-  EXPECT_NEAR(q.length(), c.length(), test_tolerance<T>());
-  EXPECT_NEAR(q.squared_length(), c.squared_length(), test_tolerance<T>());
+    EXPECT_NEAR(q.length(), c.length(), test_tolerance<T>());
+    EXPECT_NEAR(q.squared_length(), c.squared_length(), test_tolerance<T>());
 }
 
 // --- multiplication: identity, associativity sanity, conjugation relation ---
 
 TYPED_TEST(QuatTypedTest, Multiplication_ByIdentity_NoChange)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> identity;
-  const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    const math::Quaternion<T> identity;
+    const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
 
-  // q * I == q and I * q == q
-  expect_quat_near(q * identity, q, test_tolerance<T>());
-  expect_quat_near(identity * q, q, test_tolerance<T>());
+    // q * I == q and I * q == q
+    expect_quat_near(q * identity, q, test_tolerance<T>());
+    expect_quat_near(identity * q, q, test_tolerance<T>());
 }
 
 TYPED_TEST(QuatTypedTest, Multiplication_IsNotCommutative_InGeneral)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
-  const math::Quaternion<T> b(T{5}, T{6}, T{7}, T{8});
+    const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
+    const math::Quaternion<T> b(T{5}, T{6}, T{7}, T{8});
 
-  const auto ab = a * b;
-  const auto ba = b * a;
+    const auto ab = a * b;
+    const auto ba = b * a;
 
-  // We don't have operator!=, so check at least one component differs by more than tolerance.
-  const T tol = test_tolerance<T>();
-  const bool differs =
-      (std::abs(ab.x() - ba.x()) > tol) ||
-      (std::abs(ab.y() - ba.y()) > tol) ||
-      (std::abs(ab.z() - ba.z()) > tol) ||
-      (std::abs(ab.w() - ba.w()) > tol);
+    // We don't have operator!=, so check at least one component differs by more than tolerance.
+    const T tol = test_tolerance<T>();
+    const bool differs =
+        (std::abs(ab.x() - ba.x()) > tol) ||
+        (std::abs(ab.y() - ba.y()) > tol) ||
+        (std::abs(ab.z() - ba.z()) > tol) ||
+        (std::abs(ab.w() - ba.w()) > tol);
 
-  EXPECT_TRUE(differs);
+    EXPECT_TRUE(differs);
 }
 
 TYPED_TEST(QuatTypedTest, Multiplication_Associativity_SanityCheck)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  // Quaternion multiplication is associative; numerics may introduce tiny error.
-  const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
-  const math::Quaternion<T> b(T{2}, T{-1}, T{0.5}, T{3});
-  const math::Quaternion<T> c(T{-2}, T{1}, T{1}, T{0});
+    // Quaternion multiplication is associative; numerics may introduce tiny error.
+    const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
+    const math::Quaternion<T> b(T{2}, T{-1}, T{0.5}, T{3});
+    const math::Quaternion<T> c(T{-2}, T{1}, T{1}, T{0});
 
-  const auto left = (a * b) * c;
-  const auto right = a * (b * c);
+    const auto left = (a * b) * c;
+    const auto right = a * (b * c);
 
-  expect_quat_near(left, right, test_tolerance<T>() * T{8});
+    expect_quat_near(left, right, test_tolerance<T>() * T{8});
 }
 
 TYPED_TEST(QuatTypedTest, ConjugateOfProduct_ReversesOrder)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  // (ab)* = b* a*
-  const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
-  const math::Quaternion<T> b(T{5}, T{6}, T{7}, T{8});
+    // (ab)* = b* a*
+    const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
+    const math::Quaternion<T> b(T{5}, T{6}, T{7}, T{8});
 
-  const auto lhs = (a * b).conjugate();
-  const auto rhs = b.conjugate() * a.conjugate();
+    const auto lhs = (a * b).conjugate();
+    const auto rhs = b.conjugate() * a.conjugate();
 
-  expect_quat_near(lhs, rhs, test_tolerance<T>() * T{8});
+    expect_quat_near(lhs, rhs, test_tolerance<T>() * T{8});
 }
 
 // --- norm multiplicativity (important for production correctness) ---
 
 TYPED_TEST(QuatTypedTest, SquaredNorm_IsMultiplicative)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
-  const math::Quaternion<T> b(T{2}, T{-1}, T{0.5}, T{3});
+    const math::Quaternion<T> a(T{1}, T{2}, T{3}, T{4});
+    const math::Quaternion<T> b(T{2}, T{-1}, T{0.5}, T{3});
 
-  const auto ab = a * b;
+    const auto ab = a * b;
 
-  const T na2 = a.squared_length();
-  const T nb2 = b.squared_length();
-  const T nab2 = ab.squared_length();
+    const T na2 = a.squared_length();
+    const T nb2 = b.squared_length();
+    const T nab2 = ab.squared_length();
 
-  EXPECT_NEAR(nab2, na2 * nb2, test_tolerance<T>() * T{64});
+    EXPECT_NEAR(nab2, na2 * nb2, test_tolerance<T>() * T{64});
 }
 
 TYPED_TEST(QuatTypedTest, ProductWithConjugate_IsPureScalarWithSquaredNorm)
 {
-  using T = TypeParam;
+    using T = TypeParam;
 
-  const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
-  const auto qc = q.conjugate();
-  const auto p1 = q * qc;
-  const auto p2 = qc * q;
+    const math::Quaternion<T> q(T{1}, T{2}, T{3}, T{4});
+    const auto qc = q.conjugate();
+    const auto p1 = q * qc;
+    const auto p2 = qc * q;
 
-  // q * q* = (0,0,0, ||q||^2)
-  const T n2 = q.squared_length();
+    // q * q* = (0,0,0, ||q||^2)
+    const T n2 = q.squared_length();
 
-  expect_quat_near(p1, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), test_tolerance<T>() * T{64});
-  expect_quat_near(p2, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), test_tolerance<T>() * T{64});
+    expect_quat_near(p1, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), test_tolerance<T>() * T{64});
+    expect_quat_near(p2, math::Quaternion<T>(T{0}, T{0}, T{0}, n2), test_tolerance<T>() * T{64});
 }

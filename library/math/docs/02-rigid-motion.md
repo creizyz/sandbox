@@ -6,15 +6,15 @@ and follows the right-hand rule in 3D.
 
 ## Rotations
 
-[`rotate(vector, angle)`](../geometric.hpp) rotates a Cartesian 2D vector about the origin.
-[`Quaternion<T>::from_axis_angle(axis, angle)`](../quaternion.hpp) accepts any finite,
+[`rotate(vector, angle)`](../geometry/vector-geometry.hpp) rotates a Cartesian 2D vector about the origin.
+[`Quaternion<T>::from_axis_angle(axis, angle)`](../geometry/quaternion.hpp) accepts any finite,
 nonzero axis and internally normalizes it. `rotation_matrix(quaternion)` returns a column-indexed
 3×3 matrix. Multiplying it by a vector gives the same rotation as `rotate(vector, quaternion)`
 up to rounding. Both operations expect a unit quaternion.
 
 ## Poses
 
-[`Pose2<T>` and `Pose3<T>`](../pose.hpp) represent rotation followed by translation and default to
+[`Pose2<T>` and `Pose3<T>`](../geometry/rigid-motion.hpp) represent rotation followed by translation and default to
 identity. Construct a pose from a translation and a rotation. `Pose2` stores the angle in
 `[-π, π)`. `Pose3` expects a unit quaternion and renormalizes the product when composing.
 
@@ -25,7 +25,7 @@ identity. Construct a pose from a translation and a rotation. `Pose2` stores the
 
 ## Angular dynamics
 
-[`integrate_angle(angle, angular_speed, timestep)`](../angular-dynamics.hpp) advances a 2D
+[`integrate_angle(angle, angular_speed, timestep)`](../geometry/rigid-motion.hpp) advances a 2D
 angle at a constant angular speed and returns the wrapped result in `[-π, π)`.
 The scalar–vector `cross(angular_speed, offset)` is the tangential velocity at a 2D point
 relative to the rotation center. Reversing the argument order negates the result.

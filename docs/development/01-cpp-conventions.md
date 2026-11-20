@@ -10,7 +10,7 @@ the [programming guideline](../../guidelines/05-programming.md).
 - Indent with four spaces and put opening braces for declarations, function bodies, and control
   blocks on their own lines.
 - Use the library include root for library headers in consumers, for example
-  `#include "math/vectors.hpp"`. Include the headers needed by the code.
+  `#include "math/linear-algebra/vectors.hpp"`. Include the headers needed by the code.
 
 Follow the required spelling for framework hooks and standard-library customization points.
 Review the impact on callers when renaming a public symbol.

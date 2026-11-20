@@ -7,11 +7,12 @@
 #include <concepts>
 #include <cstddef>
 #include <numbers>
+#include <stdexcept>
 
-#include "polar.hpp"
-#include "vectors.hpp"
-#include "quaternion.hpp"
-#include "detail/angle.hpp"
+#include "math/geometry/polar.hpp"
+#include "math/linear-algebra/vectors.hpp"
+#include "math/geometry/quaternion.hpp"
+#include "math/detail/angle.hpp"
 
 namespace math
 {
@@ -221,5 +222,33 @@ namespace math
             sweep -= std::copysign(T{2} * pi, sweep);
         }
         return Polar2<T>{radius, a.angle() + t * sweep};
+    }
+
+    template <std::floating_point T>
+    [[nodiscard]] T clamped_linear_map(T value, T input_min, T input_max, T output_start, T output_end)
+    {
+        if (!std::isfinite(value) || !std::isfinite(input_min) || !std::isfinite(input_max) ||
+            !std::isfinite(output_start) || !std::isfinite(output_end) || !(input_min < input_max))
+        {
+            throw std::invalid_argument("Linear mapping requires finite values and an increasing input interval");
+        }
+        const T clamped = std::clamp(value, input_min, input_max);
+        const T range = input_max - input_min;
+        const T t = std::isfinite(range)
+                        ? (clamped - input_min) / range
+                        : (clamped / T{2} - input_min / T{2}) / (input_max / T{2} - input_min / T{2});
+        return std::lerp(output_start, output_end, t);
+    }
+
+    // After one time constant, the remaining distance to a fixed target is 1/e of its initial value.
+    template <std::floating_point T>
+    [[nodiscard]] T smooth_towards(T current, T target, T duration, T time_constant)
+    {
+        if (!std::isfinite(current) || !std::isfinite(target) || !std::isfinite(duration) || duration < T{0} ||
+            !std::isfinite(time_constant) || !(time_constant > T{0}))
+        {
+            throw std::invalid_argument("Exponential smoothing requires finite values, a nonnegative duration, and a positive time constant");
+        }
+        return std::lerp(current, target, -std::expm1(-duration / time_constant));
     }
 }

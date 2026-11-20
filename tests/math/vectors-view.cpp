@@ -4,8 +4,8 @@
 #include <type_traits>
 #include <cmath>
 
-#include "math/vectors-view.hpp"
-#include "math/vectors.hpp"
+#include "math/linear-algebra/vectors-view.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 namespace math::tests
 {
@@ -18,9 +18,9 @@ namespace math::tests
         }
 
         template <std::size_t N, typename T>
-        std::array<T*, N> ptrs_from_values(std::array<T, N>& values)
+        std::array<T *, N> ptrs_from_values(std::array<T, N> &values)
         {
-            std::array<T*, N> out{};
+            std::array<T *, N> out{};
             for (std::size_t i = 0; i < N; ++i)
             {
                 out[i] = &values[i];
@@ -35,7 +35,7 @@ namespace math::tests
     static_assert(std::is_copy_constructible_v<VectorView<3, int>>);
     static_assert(std::is_move_constructible_v<VectorView<3, int>>);
 
-    static_assert(std::is_constructible_v<VectorView<2, int>, int*, int*>);
+    static_assert(std::is_constructible_v<VectorView<2, int>, int *, int *>);
     static_assert(!std::is_default_constructible_v<VectorView<2, int>>);
 
     static_assert(std::is_constructible_v<ConstVectorView<3, float>, VectorView<3, float>>);
@@ -87,7 +87,7 @@ namespace math::tests
     TEST(VectorView, ConstructorRejectsNullPointer_DebugDeathTest)
     {
         int a = 1, b = 2;
-        int* null_ptr = nullptr;
+        int *null_ptr = nullptr;
 
         // Pack constructor uses assert_non_null_pack
         EXPECT_DEATH(
@@ -95,18 +95,16 @@ namespace math::tests
                 VectorView3<int> v(&a, &b, null_ptr);
                 (void)v;
             },
-            "null pointer"
-        );
+            "null pointer");
 
         // Array constructor uses assert_non_null
-        std::array<int*, 3> ptrs{&a, &b, nullptr};
+        std::array<int *, 3> ptrs{&a, &b, nullptr};
         EXPECT_DEATH(
             {
                 VectorView3<int> v(ptrs);
                 (void)v;
             },
-            "null pointer"
-        );
+            "null pointer");
     }
 #endif
 
@@ -152,8 +150,7 @@ namespace math::tests
             {
                 (void)v.at(3);
             },
-            ""
-        );
+            "");
 #endif
     }
 
@@ -216,7 +213,8 @@ namespace math::tests
         int a = 1, b = 2, c = 3;
         VectorView<3, int> v(&a, &b, &c);
 
-        v.apply([](int x) { return x * 2; });
+        v.apply([](int x)
+                { return x * 2; });
 
         EXPECT_EQ(a, 2);
         EXPECT_EQ(b, 4);
@@ -231,7 +229,8 @@ namespace math::tests
         VectorView<3, int> v(&a, &b, &c);
         VectorView<3, int> other(&d, &e, &f);
 
-        v.apply(other, [](int a, int b) { return a + b; });
+        v.apply(other, [](int a, int b)
+                { return a + b; });
 
         EXPECT_EQ(a, 11);
         EXPECT_EQ(b, 22);
@@ -245,9 +244,12 @@ namespace math::tests
         int a = 2, b = 4, c = 6;
         VectorView<3, int> v(&a, &b, &c);
 
-        EXPECT_TRUE(v.all([](int x) { return x % 2 == 0; }));
-        EXPECT_TRUE(v.any([](int x) { return x == 4; }));
-        EXPECT_FALSE(v.any([](int x) { return x == 5; }));
+        EXPECT_TRUE(v.all([](int x)
+                          { return x % 2 == 0; }));
+        EXPECT_TRUE(v.any([](int x)
+                          { return x == 4; }));
+        EXPECT_FALSE(v.any([](int x)
+                           { return x == 5; }));
     }
 
     TEST(VectorView, AllAndAnyAgainstVectorWithBinaryPredicate)
@@ -260,8 +262,10 @@ namespace math::tests
         other[1] = 0;
         other[2] = 3;
 
-        EXPECT_FALSE(v.all(other, [](int lhs, int rhs) { return lhs == rhs; }));
-        EXPECT_TRUE(v.any(other, [](int lhs, int rhs) { return lhs == rhs; }));
+        EXPECT_FALSE(v.all(other, [](int lhs, int rhs)
+                           { return lhs == rhs; }));
+        EXPECT_TRUE(v.any(other, [](int lhs, int rhs)
+                          { return lhs == rhs; }));
     }
 
     // --- Arithmetic ops (mutating) ---

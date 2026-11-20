@@ -4,12 +4,11 @@
 #include <limits>
 #include <numbers>
 
-#include "math/angular-dynamics.hpp"
-#include "math/geometric.hpp"
-#include "math/matrix.hpp"
-#include "math/pose.hpp"
-#include "math/quaternion.hpp"
-#include "math/vectors.hpp"
+#include "math/geometry/rigid-motion.hpp"
+#include "math/geometry/vector-geometry.hpp"
+#include "math/linear-algebra/matrix.hpp"
+#include "math/geometry/quaternion.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 namespace math::tests
 {

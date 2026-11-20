@@ -5,8 +5,8 @@
 #include <concepts>
 #include <numbers>
 
-#include "detail/angle.hpp"
-#include "vectors.hpp"
+#include "math/detail/angle.hpp"
+#include "math/linear-algebra/vectors.hpp"
 
 namespace math
 {
